@@ -1,9 +1,9 @@
-eesql
-=====
+[TOC]
+
+# eesql
 
 Erlang Embedded SQL library
 
-Build
------
+## Build
 
     $ rebar3 compile
