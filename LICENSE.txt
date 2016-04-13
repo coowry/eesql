@@ -1,0 +1,12 @@
+                     Coowry Ltd. Copyright Notice
+
+                  Copyright © 2013-2014 Coowry Ltd.
+
+                         All rights reserved
+
+All information contained in this package is, and remains the property
+of Coowry Ltd.  The intellectual and technical concepts contained are
+proprietary to Coowry Ltd. Dissemination of this information or
+reproduction of this material is strictly forbidden unless prior
+written permission is obtained from Coowry Ltd.
+
