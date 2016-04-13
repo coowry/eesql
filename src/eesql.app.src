@@ -1,5 +1,5 @@
 {application, eesql,
- [{description, "An OTP library"},
+ [{description, "Erlang Embedded SQL library"},
   {vsn, "0.1.0"},
   {registered, []},
   {applications,
