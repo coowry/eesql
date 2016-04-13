@@ -1,7 +1,7 @@
 eesql
 =====
 
-An OTP library
+Erlang Embedded SQL library
 
 Build
 -----
