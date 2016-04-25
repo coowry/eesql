@@ -114,23 +114,6 @@ intersperse([X | Xs], I) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Serializes an SQL statement.
-%%
-%% Usage examples:
-%% (core@127.0.0.1)45> io:format("~s~n",[sql:to_sql(#select{from = [users]})]).
-%% SELECT ALL * FROM users ;
-%% ok
-%% (core@127.0.0.1)47> io:format("~s~n",[sql:to_sql(#select{columns=[username, name],from = [users]})]).
-%% SELECT ALL username, name FROM users ;
-%% ok
-%% (core@127.0.0.1)48> io:format("~s~n",[sql:to_sql(#select{columns=['users.name','emails.address'],from = [users,emails], where=[{'users.id','=','emails.id'}]})]).
-%% SELECT ALL users.name, emails.address FROM users, emails WHERE users.id = emails.id;
-%% ok
-%% (core@127.0.0.1)50> io:format("~s~n",[sql:to_sql(#select{from = [users], where = [{created,'>',cw_time:now()}]})]).
-%% SELECT ALL * FROM users WHERE created > 1459286860;
-%% ok
-%% (core@127.0.0.1)11> sql:to_sql(#delete{from=preuser}).
-%% ["DELETE FROM ",<<"preuser">>,[]," RETURNING *;"]
-%% ok
 -spec to_sql(select_stmt()
              | insert_stmt()
              | update_stmt()
