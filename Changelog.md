@@ -4,6 +4,8 @@
 
 ## Next release
 
+- Usage examples moved to tests.
+- TOC added to Changelog.
 - First unit test added, extracted from examples in comments.
 
 ## v0.1.0
