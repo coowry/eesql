@@ -1,3 +1,5 @@
+[TOC]
+
 # eesql Changelog
 
 ## Next release
