@@ -4,6 +4,7 @@
 
 ## Next release
 
+- Serialization of <joined table>.
 - Initial Makefile.
 - Directory test/ added to source dir (to allow dialyzer to dialyzes
   the tests).
