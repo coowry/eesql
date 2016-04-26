@@ -20,7 +20,9 @@
 -export_type(
    [sql_stmt/0,
     query_specification/0,
-    table_reference/0]
+    from_clause/0,
+    join_type/0,
+    table_ref/0]
 ).
 
 %% TODO: convert to non terminal symbols from http://savage.net.au/SQL/sql-2003-2.bnf.html
@@ -68,8 +70,8 @@
                 | {name(), name()}. %% AS
 
 %% Expressions for describing "tables" (eg. FROM in a SELECT statement)
--type table_reference() :: table_primary()
-                         | joined_table().
+-type table_ref() :: table_primary()
+                   | joined_table().
 
 -type table_primary() :: name()
                        | {name(), name()}. %% AS
@@ -116,6 +118,8 @@
 %% SELECT <query specification>
 -type query_specification() :: #select{}.
 
+-type from_clause() :: nonempty_list(table_ref()).
+
 %% A insert statement
 -type insert_stmt() :: #insert{}.
 
@@ -148,7 +152,7 @@ to_sql(#select{dup = Duplicate,
     _ ->
       Items = intersperse([col_to_sql(Column) || Column <- Columns], ", ")
   end,
-  From_Clause = ["FROM ", intersperse([table_to_sql(Table) || Table <- From], ", ")],
+  From_Clause = ["FROM ", intersperse([table_ref_to_sql(Table_Ref) || Table_Ref <- From], ", ")],
   Where_Clause =
     case Where of
       [] -> "";
@@ -197,6 +201,31 @@ to_sql(#delete{from = Table,
   ["DELETE FROM ", table_to_sql(Table),
    Where_Clause,
    " RETURNING *;"].
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% @doc Serialize a <table reference>
+-spec table_ref_to_sql(table_ref()) -> iodata().
+table_ref_to_sql(#join{type = Type,
+                       left = Left,
+                       right = Right,
+                       spec = Spec}) ->
+  [table_ref_to_sql(Left),$ ,
+   case Type of
+     inner -> "INNER";
+     left -> "LEFT OUTER";
+     right -> "RIGHT OUTER";
+     full -> "FULL OUTER"
+   end, $ ,
+   "JOIN",$ ,
+   table_ref_to_sql(Right),$ ,
+   "ON",$ ,
+   pred_to_sql(Spec)];
+table_ref_to_sql({Table_Name, Correlation_Name}) ->
+  [atom_to_binary(Table_Name, utf8),$ ,
+   "AS",$ ,
+   atom_to_binary(Correlation_Name, utf8)];
+table_ref_to_sql(Table_Name) ->
+  atom_to_binary(Table_Name, utf8).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Serialize a name

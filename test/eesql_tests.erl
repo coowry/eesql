@@ -13,6 +13,16 @@ select2_test() ->
   ?assertEqual("SELECT ALL username, name FROM users ;",
                lists:flatten(io_lib:format("~s",[Select_AST]))).
 
+select_join_test() ->
+  Select_AST = eesql:to_sql(#select{
+                               columns=['users.name','emails.address'],
+                               from = [#join{type= inner,
+                                             left = users,
+                                             right = emails,
+                                             spec = {'users.id','=','emails.id'}}]}),
+  ?assertEqual("SELECT ALL users.name, emails.address FROM users INNER JOIN emails ON users.id = emails.id ;",
+               lists:flatten(io_lib:format("~s",[Select_AST]))).
+
 select_theta_test() ->
   Select_AST = eesql:to_sql(#select{
                                columns=['users.name','emails.address'],

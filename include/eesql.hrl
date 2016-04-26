@@ -12,7 +12,7 @@
    {
      dup = all :: eesql:dup(),
      columns = [] :: list(eesql:column()), %% List of columns to retrieve, * as []
-     from :: nonempty_list(eesql:table_reference()), %% (FROM) Source of data, table names for the moment
+     from :: eesql:from_clause(), %% (FROM) Source of data, table names for the moment
      where = [] :: list(eesql:predicate()), %% (WHERE) search_condition
      group_by = [] :: list(eesql:group_by_expr()), %% (GROUP BY) group_by_expression
      having = [] :: list(eesql:predicate()), %% (HAVING) search_condition
@@ -23,9 +23,9 @@
 -record(
    join,
    {
-     left :: eesql:table_reference(),
      type = inner :: eesql:join_type(),
-     right :: eesql:table_reference(),
+     left :: eesql:table_ref(),
+     right :: eesql:table_ref(),
      spec :: eesql:predicate()
    }
   ).
@@ -33,7 +33,7 @@
 -record(
    insert,
    {
-     table :: eesql:table_reference(),
+     table :: eesql:table_ref(),
      columns :: nonempty_list(eesql:column()), %% List of columns to set
      values :: nonempty_list(nonempty_list(eesql:value())) %% (VALUES) values to insert
    }
@@ -42,7 +42,7 @@
 -record(
    update,
    {
-     table :: eesql:table_reference(),
+     table :: eesql:table_ref(),
      set :: nonempty_list({eesql:name(), eesql:expr()}), %% (SET) columns to update
      where = [] :: list(eesql:predicate()) %% (WHERE) search_condition
    }
@@ -51,7 +51,7 @@
 -record(
    delete,
    {
-     from :: eesql:table_reference(), %% (FROM) Source of data, table names for the moment
+     from :: eesql:table_ref(), %% (FROM) Source of data, table names for the moment
      where = [] :: list(eesql:predicate()) %% (WHERE) search_condition
    }
   ).
