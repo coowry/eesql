@@ -4,6 +4,7 @@
 
 ## Next release
 
+- Initial Makefile.
 - Directory test/ added to source dir (to allow dialyzer to dialyzes
   the tests).
 - Using non terminal symbols at
