@@ -4,6 +4,8 @@
 
 ## Next release
 
+## v0.2.0
+
 - Makefile pull/push targets added.
 - Serialization of <joined table>.
 - Initial Makefile.
