@@ -7,5 +7,8 @@ dialyze:
 test:
 	./rebar3 eunit
 
-.PHONY: compile test dialyze
+clean:
+	./rebar3 clean
+
+.PHONY: compile test dialyze clean
 
