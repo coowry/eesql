@@ -4,6 +4,7 @@
 
 ## Next release
 
+- Makefile pull/push targets added.
 - Serialization of <joined table>.
 - Initial Makefile.
 - Directory test/ added to source dir (to allow dialyzer to dialyzes
