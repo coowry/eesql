@@ -14,7 +14,7 @@
 - TOC added to Changelog.
 - First unit test added, extracted from examples in comments.
 
-## v0.1.0
+## v0.1.1
 
 - sql module name reminiscence moved to eesql.
 
