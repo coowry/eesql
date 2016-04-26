@@ -4,6 +4,10 @@
 
 ## Next release
 
+- Directory test/ added to source dir (to allow dialyzer to dialyzes
+  the tests).
+- Using non terminal symbols at
+  http://savage.net.au/SQL/sql-2003-2.bnf.html as reference.
 - Usage examples moved to tests.
 - TOC added to Changelog.
 - First unit test added, extracted from examples in comments.
