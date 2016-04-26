@@ -7,27 +7,46 @@
 %% @doc SQL Abstract Syntax Tree.
 %%
 %% Reference material:
+%% - http://savage.net.au/SQL/ (http://savage.net.au/SQL/sql-2003-2.bnf.html)
 %% - Module epgsql.erl
+%% - http://www.postgresql.org/docs/current/static/sql.html
 %% - http://ns.inria.fr/ast/sql/index.html
-%% - http://www.postgresql.org/docs/9.5/static/sql.html
-%% - http://savage.net.au/SQL/
 -module(eesql).
 
 -include("include/eesql.hrl").
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Non terminal symbols from http://savage.net.au/SQL/sql-2003-2.bnf.html
 -export_type(
    [sql_stmt/0,
-    select_stmt/0, insert_stmt/0, update_stmt/0, delete_stmt/0,
+    query_specification/0,
+    from_clause/0,
+    join_type/0,
+    table_ref/0]
+).
+
+%% TODO: convert to non terminal symbols from http://savage.net.au/SQL/sql-2003-2.bnf.html
+-export_type(
+   [insert_stmt/0, update_stmt/0, delete_stmt/0,
     dup/0,
-    name/0, column/0, table/0,
+    name/0, column/0,
     predicate/0, join_cond/0, group_by_expr/0, order_by_expr/0,
     value/0,
     expr/0,
     binop/0]).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -export([to_sql/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% The following types represents the PG SQL Abstract Syntax Tree.
+
+%% Key SQL statements and fragments
+-type sql_stmt() ::
+        query_specification()
+      | insert_stmt()
+      | update_stmt()
+      | delete_stmt().
 
 %% Any SQL value in the rows (inspired by epgsql:bind_param())
 -type value() ::
@@ -51,8 +70,19 @@
                 | {name(), name()}. %% AS
 
 %% Expressions for describing "tables" (eg. FROM in a SELECT statement)
--type table() :: name()
-               | {name(), name()}. % AS
+-type table_ref() :: table_primary()
+                   | joined_table().
+
+-type table_primary() :: name()
+                       | {name(), name()}. %% AS
+
+-type joined_table() :: qualified_join().
+
+-type qualified_join() :: #join{}.
+
+-type join_type() :: inner | left | right | full.
+
+-type join_condition() :: join_condition().
 
 %% ALL and DISTINCT
 -type dup() :: all | distinct.
@@ -68,9 +98,9 @@
       | {expr(), binop(), expr()}
       | {column(), like, binary()}
       | {is_null, column()}
-      | {exists, select_stmt()}
+      | {exists, query_specification()}
       | {between, expr(), expr(), expr()}
-      | {in, expr(), select_stmt()}.
+      | {in, expr(), query_specification()}.
       %% | some, all, ...
 
 %% Expressions
@@ -85,8 +115,10 @@
 %% Order by expression (not contemplated for the moment).
 -type order_by_expr() :: undefined.
 
-%% A select statement
--type select_stmt() :: #select{}.
+%% SELECT <query specification>
+-type query_specification() :: #select{}.
+
+-type from_clause() :: nonempty_list(table_ref()).
 
 %% A insert statement
 -type insert_stmt() :: #insert{}.
@@ -94,14 +126,8 @@
 %% A update statement
 -type update_stmt() :: #update{}.
 
-%% A select statement
+%% A delete statement
 -type delete_stmt() :: #delete{}.
-
-%% A SQL statement
--type sql_stmt() :: select_stmt()
-                  | insert_stmt()
-                  | update_stmt()
-                  | delete_stmt().
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc X = [1,2,3], [1, x, 2, x, 3] = intersperse(X, x)
@@ -114,28 +140,7 @@ intersperse([X | Xs], I) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Serializes an SQL statement.
-%%
-%% Usage examples:
-%% (core@127.0.0.1)45> io:format("~s~n",[sql:to_sql(#select{from = [users]})]).
-%% SELECT ALL * FROM users ;
-%% ok
-%% (core@127.0.0.1)47> io:format("~s~n",[sql:to_sql(#select{columns=[username, name],from = [users]})]).
-%% SELECT ALL username, name FROM users ;
-%% ok
-%% (core@127.0.0.1)48> io:format("~s~n",[sql:to_sql(#select{columns=['users.name','emails.address'],from = [users,emails], where=[{'users.id','=','emails.id'}]})]).
-%% SELECT ALL users.name, emails.address FROM users, emails WHERE users.id = emails.id;
-%% ok
-%% (core@127.0.0.1)50> io:format("~s~n",[sql:to_sql(#select{from = [users], where = [{created,'>',cw_time:now()}]})]).
-%% SELECT ALL * FROM users WHERE created > 1459286860;
-%% ok
-%% (core@127.0.0.1)11> sql:to_sql(#delete{from=preuser}).
-%% ["DELETE FROM ",<<"preuser">>,[]," RETURNING *;"]
-%% ok
--spec to_sql(select_stmt()
-             | insert_stmt()
-             | update_stmt()
-             | delete_stmt())
-            -> Equery :: iodata().
+-spec to_sql(sql_stmt()) -> Equery :: iodata().
 to_sql(#select{dup = Duplicate,
                columns = Columns,
                from = From,
@@ -147,7 +152,7 @@ to_sql(#select{dup = Duplicate,
     _ ->
       Items = intersperse([col_to_sql(Column) || Column <- Columns], ", ")
   end,
-  From_Clause = ["FROM ", intersperse([table_to_sql(Table) || Table <- From], ", ")],
+  From_Clause = ["FROM ", intersperse([table_ref_to_sql(Table_Ref) || Table_Ref <- From], ", ")],
   Where_Clause =
     case Where of
       [] -> "";
@@ -196,6 +201,31 @@ to_sql(#delete{from = Table,
   ["DELETE FROM ", table_to_sql(Table),
    Where_Clause,
    " RETURNING *;"].
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% @doc Serialize a <table reference>
+-spec table_ref_to_sql(table_ref()) -> iodata().
+table_ref_to_sql(#join{type = Type,
+                       left = Left,
+                       right = Right,
+                       spec = Spec}) ->
+  [table_ref_to_sql(Left),$ ,
+   case Type of
+     inner -> "INNER";
+     left -> "LEFT OUTER";
+     right -> "RIGHT OUTER";
+     full -> "FULL OUTER"
+   end, $ ,
+   "JOIN",$ ,
+   table_ref_to_sql(Right),$ ,
+   "ON",$ ,
+   pred_to_sql(Spec)];
+table_ref_to_sql({Table_Name, Correlation_Name}) ->
+  [atom_to_binary(Table_Name, utf8),$ ,
+   "AS",$ ,
+   atom_to_binary(Correlation_Name, utf8)];
+table_ref_to_sql(Table_Name) ->
+  atom_to_binary(Table_Name, utf8).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Serialize a name

@@ -1,14 +1,24 @@
 default:
-	@echo Usage: make [pull] [push]
+	@echo Usage: make [compile] [test] [dialyze] [clean] [pull] [push]
+
+compile:
+	./rebar3 compile
+
+dialyze:
+	./rebar3 dialyzer -s
+
+test:
+	./rebar3 eunit
+
+clean:
+	./rebar3 clean
 
 pull:
-	git checkout develop
-	git pull
-	git checkout master
-	git pull
+	git fetch --prune
+	git checkout master && git merge origin/master
+	git checkout develop && git merge origin/develop
 
 push: pull
-	git push origin master develop
-	git push --tags
+	git push --follow-tags origin master develop
 
-.PHONY: default pull push
+.PHONY: compile test dialyze clean pull push
