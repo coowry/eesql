@@ -18,21 +18,33 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Non terminal symbols from http://savage.net.au/SQL/sql-2003-2.bnf.html
 -export_type(
-   [sql_stmt/0,
-    query_specification/0,
+   [
+    commit_stmt/0,
+    column_name/0,
+    delete_stmt/0,
+    derived_column/0,
     from_clause/0,
+    insert_stmt/0,
     join_type/0,
-    table_ref/0]
+    literal/0,
+    query_spec/0,
+    rollback_stmt/0,
+    row_value_expr/0,
+    set_clause/0,
+    set_quant/0,
+    sql_stmt/0,
+    start_trans_stmt/0,
+    table_name/0,
+    table_ref/0,
+    update_stmt/0,
+    value_expr/0
+   ]
 ).
 
 %% TODO: convert to non terminal symbols from http://savage.net.au/SQL/sql-2003-2.bnf.html
 -export_type(
-   [insert_stmt/0, update_stmt/0, delete_stmt/0,
-    dup/0,
-    name/0, column/0,
-    predicate/0, join_cond/0, group_by_expr/0, order_by_expr/0,
-    value/0,
-    expr/0,
+   [name/0,
+    predicate/0,
     binop/0]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -43,13 +55,19 @@
 
 %% Key SQL statements and fragments
 -type sql_stmt() ::
-        query_specification()
+        commit_stmt()
+      | start_trans_stmt()
+      | rollback_stmt()
+      | query_spec()
       | insert_stmt()
       | update_stmt()
       | delete_stmt().
 
-%% Any SQL value in the rows (inspired by epgsql:bind_param())
--type value() ::
+%% Any name (column name, table name, alias, ...)
+-type name() :: atom().
+
+%% <literal> (any SQL literal inspired by epgsql:bind_param())
+-type literal() ::
         null
       | boolean()
       %% | string() %% Let's avoid confussion with arrays
@@ -60,14 +78,21 @@
       %% | calendar:time() %actualy, `Seconds' may be float()
       %% | calendar:datetime()
       %% | {calendar:time(), Days::non_neg_integer(), Months::non_neg_integer()}
-      | [value()]. %array (maybe nested)
+      | [literal()]. %array (maybe nested)
 
-%% Any name (column name, table name, alias, ...)
--type name() :: atom().
+%% <table name>
+-type table_name() :: name().
 
-%% Expressions for describing columns (eg. in a SELECT statement)
--type column() :: name()
-                | {name(), name()}. %% AS
+%% <column name>
+-type column_name() :: name().
+
+%% <row value expression>
+-type row_value_expr() :: nonempty_list(literal()).
+
+%% <derived column>
+-type derived_column() ::
+        value_expr()
+      | {value_expr(), column_name()}. %% AS
 
 %% Expressions for describing "tables" (eg. FROM in a SELECT statement)
 -type table_ref() :: table_primary()
@@ -84,49 +109,54 @@
 
 -type join_condition() :: join_condition().
 
-%% ALL and DISTINCT
--type dup() :: all | distinct.
-
-%% Join condition (not contemplated for the moment).
--type join_cond() :: undefined.
+%% <set quantifier>
+-type set_quant() :: all | distinct.
 
 %% Predicates
 -type predicate() ::
         {'not', predicate()}
       | {'and', [predicate()]}
       | {'or', [predicate()]}
-      | {expr(), binop(), expr()}
-      | {column(), like, binary()}
-      | {is_null, column()}
-      | {exists, query_specification()}
-      | {between, expr(), expr(), expr()}
-      | {in, expr(), query_specification()}.
+      | {value_expr(), binop(), value_expr()}
+      | {column_name(), like, binary()}
+      | {is_null, column_name()}
+      | {exists, query_spec()}
+      | {between, value_expr(), value_expr(), value_expr()}
+      | {in, value_expr(), query_spec()}.
       %% | some, all, ...
 
-%% Expressions
--type expr() :: column() | value().
+%% <value expr>
+-type value_expr() ::
+        column_name()
+      | literal().
 
 %% Binary operators
 -type binop() :: '=' | '!=' | '<' | '>' | '<=' | '>=' | like.
 
-%% Group by expression (not contemplated for the moment).
--type group_by_expr() :: undefined.
+%% COMMIT <commit stmt>
+-type commit_stmt() :: commit | commit_and_chain | commit_and_no_chain.
 
-%% Order by expression (not contemplated for the moment).
--type order_by_expr() :: undefined.
+%% START TRANSACTION <start transaction statement>
+-type start_trans_stmt() :: start_transaction.
+
+%% ROLLBACK <rollback stmt>
+-type rollback_stmt() :: rollback.
 
 %% SELECT <query specification>
--type query_specification() :: #select{}.
+-type query_spec() :: #select{}.
 
 -type from_clause() :: nonempty_list(table_ref()).
 
-%% A insert statement
+%% INSERT <insert statement>
 -type insert_stmt() :: #insert{}.
 
-%% A update statement
+%% UPDATE <update statement: searched>
 -type update_stmt() :: #update{}.
 
-%% A delete statement
+%% <set clause>
+-type set_clause() :: {column_name(), value_expr()}.
+
+%% DELETE <delete statement: searched>
 -type delete_stmt() :: #delete{}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -141,66 +171,67 @@ intersperse([X | Xs], I) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Serializes an SQL statement.
 -spec to_sql(sql_stmt()) -> Equery :: iodata().
-to_sql(#select{dup = Duplicate,
+to_sql(start_transaction) ->
+  "BEGIN TRANSACTION;";
+to_sql(commit) ->
+  "COMMIT;";
+to_sql(commit_and_chain) ->
+  "COMMIT AND CHAIN;";
+to_sql(commit_and_no_chain) ->
+  "COMMIT AND NO CHAIN;";
+to_sql(rollback) ->
+  "ROLLBACK;";
+to_sql(#select{quantifier = Quant,
                columns = Columns,
                from = From,
                where = Where}) ->
-  Dup = dup_to_sql(Duplicate),
+  Quant_SQL = set_quant_to_sql(Quant),
   case Columns of
     [] ->
       Items = "*";
     _ ->
-      Items = intersperse([col_to_sql(Column) || Column <- Columns], ", ")
+      Items = intersperse([derived_col_to_sql(Column) || Column <- Columns], ", ")
   end,
-  From_Clause = ["FROM ", intersperse([table_ref_to_sql(Table_Ref) || Table_Ref <- From], ", ")],
-  Where_Clause =
-    case Where of
-      [] -> "";
-      [Predicate] -> ["WHERE ", pred_to_sql(Predicate)]
-    end,
-  Equery = intersperse(
-             ["SELECT", Dup, Items, From_Clause, Where_Clause],
-             " "
-            ),
-  [Equery, ";"];
+  From_Clause =
+    [" FROM ",
+     intersperse([table_ref_to_sql(Table_Ref) || Table_Ref <- From], ", ")],
+  Where_Clause = where_to_sql(Where),
+  ["SELECT ", Quant_SQL, " ", Items, From_Clause, Where_Clause, ";"];
 to_sql(#insert{table = Table, columns = Columns, values = Rows}) ->
-  ["INSERT INTO ", table_to_sql(Table),
-   " (",
-   intersperse([col_to_sql(Column) || Column <- Columns], ", "),
-   ")",
-   " VALUES ", intersperse([["(",
-                             intersperse([expr_to_sql(Expr)
-                                          || Expr <- Row],
-                                         ", "),
-                             ")"]
-                            || Row <- Rows],
-                           ", "),
+  ["INSERT INTO ",
+   name_to_sql(Table),
+   " (", intersperse([name_to_sql(Column) || Column <- Columns], ", "), ")",
+   " VALUES ",
+   intersperse([["(",
+                 intersperse([expr_to_sql(Expr)
+                              || Expr <- Row],
+                             ", "),
+                 ")"]
+                || Row <- Rows],
+               ", "),
    " RETURNING *;"];
 to_sql(#update{table = Table,
                set = Set,
                where = Where}) ->
-  Where_Clause =
-    case Where of
-      [] -> "";
-      [Predicate] -> [" WHERE ", pred_to_sql(Predicate)]
-    end,
-  ["UPDATE ", table_to_sql(Table),
+  Where_Clause = where_to_sql(Where),
+  ["UPDATE ",
+   name_to_sql(Table),
    " SET ",
-   intersperse([[col_to_sql(Column), " = ", expr_to_sql(Expr)]
+   intersperse([[name_to_sql(Column), " = ", expr_to_sql(Expr)]
                 || {Column, Expr} <- Set],
                ", "),
    Where_Clause,
    " RETURNING *;"];
-to_sql(#delete{from = Table,
+to_sql(#delete{table = Table,
                where = Where}) ->
-  Where_Clause =
-    case Where of
-      [] -> "";
-      [Predicate] -> [" WHERE ", pred_to_sql(Predicate)]
-    end,
-  ["DELETE FROM ", table_to_sql(Table),
-   Where_Clause,
-   " RETURNING *;"].
+  Where_Clause = where_to_sql(Where),
+  ["DELETE FROM ", name_to_sql(Table), Where_Clause, " RETURNING *;"].
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% @doc Serialize a where clause
+-spec where_to_sql(undefined | predicate()) -> iodata().
+where_to_sql(undefined) -> "";
+where_to_sql(Predicate) -> [" WHERE ", pred_to_sql(Predicate)].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Serialize a <table reference>
@@ -216,7 +247,7 @@ table_ref_to_sql(#join{type = Type,
      right -> "RIGHT OUTER";
      full -> "FULL OUTER"
    end, $ ,
-   "JOIN",$ ,
+   "JOIN ",
    table_ref_to_sql(Right),$ ,
    "ON",$ ,
    pred_to_sql(Spec)];
@@ -234,26 +265,18 @@ name_to_sql(Name) ->
   atom_to_binary(Name, utf8).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% @doc Serialize all and distinct
--spec dup_to_sql(dup()) -> iodata().
-dup_to_sql(all) -> "ALL";
-dup_to_sql(distinct) -> "DISTINCT".
+%% @doc Serialize set quantifier
+-spec set_quant_to_sql(set_quant()) -> iodata().
+set_quant_to_sql(all) -> "ALL";
+set_quant_to_sql(distinct) -> "DISTINCT".
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% @doc Serialize a column description
--spec col_to_sql(column()) -> iodata().
-col_to_sql(Column) when is_atom(Column) ->
+%% @doc Serialize a derived column
+-spec derived_col_to_sql(derived_column()) -> iodata().
+derived_col_to_sql(Column) when is_atom(Column) ->
   name_to_sql(Column);
-col_to_sql({Column, Alias}) ->
+derived_col_to_sql({Column, Alias}) ->
   [name_to_sql(Column), " AS ", name_to_sql(Alias)].
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% @doc Serialize a data source description
--spec table_to_sql(column()) -> iodata().
-table_to_sql(Table) when is_atom(Table) ->
-  name_to_sql(Table);
-table_to_sql({Table, Alias}) ->
-  [name_to_sql(Table), " AS ", name_to_sql(Alias)].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Serialize a predicate to SQL.
@@ -292,7 +315,7 @@ pred_to_sql({in, Expr, Select = #select{}}) ->
   
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Serialize a expression to SQL.
--spec expr_to_sql(Expr :: expr()) -> iodata().
+-spec expr_to_sql(Expr :: value_expr()) -> iodata().
 expr_to_sql(null) ->
   <<"NULL">>;
 expr_to_sql(true) ->

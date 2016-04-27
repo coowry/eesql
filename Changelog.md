@@ -4,6 +4,13 @@
 
 ## Next release
 
+## v0.2.1
+
+- New statements added: <start transaction statement>,
+  <commit statement>, <rollback statement>.
+- Refactoring: introducing non terminal symbols from SQL grammar.
+- eesql:query_specification/0 renamed to eesql:query_spec/0
+
 ## v0.2.0
 
 - Makefile pull/push targets added.
