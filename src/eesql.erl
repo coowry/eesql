@@ -19,7 +19,7 @@
 %% Non terminal symbols from http://savage.net.au/SQL/sql-2003-2.bnf.html
 -export_type(
    [sql_stmt/0,
-    query_specification/0,
+    query_spec/0,
     from_clause/0,
     join_type/0,
     table_ref/0]
@@ -43,7 +43,7 @@
 
 %% Key SQL statements and fragments
 -type sql_stmt() ::
-        query_specification()
+        query_spec()
       | insert_stmt()
       | update_stmt()
       | delete_stmt().
@@ -98,9 +98,9 @@
       | {expr(), binop(), expr()}
       | {column(), like, binary()}
       | {is_null, column()}
-      | {exists, query_specification()}
+      | {exists, query_spec()}
       | {between, expr(), expr(), expr()}
-      | {in, expr(), query_specification()}.
+      | {in, expr(), query_spec()}.
       %% | some, all, ...
 
 %% Expressions
@@ -116,7 +116,7 @@
 -type order_by_expr() :: undefined.
 
 %% SELECT <query specification>
--type query_specification() :: #select{}.
+-type query_spec() :: #select{}.
 
 -type from_clause() :: nonempty_list(table_ref()).
 
