@@ -4,6 +4,8 @@
 
 ## Next release
 
+## v0.2.1
+
 - New statements added: <start transaction statement>,
   <commit statement>, <rollback statement>.
 - Refactoring: introducing non terminal symbols from SQL grammar.
