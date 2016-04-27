@@ -57,3 +57,19 @@ update_test() ->
                                     set = [{a,21}]}),
   ?assertEqual("UPDATE preuser SET a = 21 RETURNING *;",
                lists:flatten(io_lib:format("~s",[Update_AST]))).
+
+start_trans_test() ->
+  Start_Trans_AST = eesql:to_sql(start_transaction),
+  ?assertEqual("BEGIN TRANSACTION;",
+               lists:flatten(io_lib:format("~s",[Start_Trans_AST]))).
+
+commit_test() ->
+  Commit_AST = eesql:to_sql(commit),
+  ?assertEqual("COMMIT;",
+               lists:flatten(io_lib:format("~s",[Commit_AST]))).
+
+rollback_test() ->
+  Rollback_AST = eesql:to_sql(rollback),
+  ?assertEqual("ROLLBACK;",
+               lists:flatten(io_lib:format("~s",[Rollback_AST]))).
+

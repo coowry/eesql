@@ -19,6 +19,7 @@
 %% Non terminal symbols from http://savage.net.au/SQL/sql-2003-2.bnf.html
 -export_type(
    [
+    commit_stmt/0,
     column_name/0,
     delete_stmt/0,
     derived_column/0,
@@ -27,10 +28,12 @@
     join_type/0,
     literal/0,
     query_spec/0,
+    rollback_stmt/0,
     row_value_expr/0,
     set_clause/0,
     set_quant/0,
     sql_stmt/0,
+    start_trans_stmt/0,
     table_name/0,
     table_ref/0,
     update_stmt/0,
@@ -52,7 +55,10 @@
 
 %% Key SQL statements and fragments
 -type sql_stmt() ::
-        query_spec()
+        commit_stmt()
+      | start_trans_stmt()
+      | rollback_stmt()
+      | query_spec()
       | insert_stmt()
       | update_stmt()
       | delete_stmt().
@@ -127,6 +133,15 @@
 %% Binary operators
 -type binop() :: '=' | '!=' | '<' | '>' | '<=' | '>=' | like.
 
+%% COMMIT <commit stmt>
+-type commit_stmt() :: commit | commit_and_chain | commit_and_no_chain.
+
+%% START TRANSACTION <start transaction statement>
+-type start_trans_stmt() :: start_transaction.
+
+%% ROLLBACK <rollback stmt>
+-type rollback_stmt() :: rollback.
+
 %% SELECT <query specification>
 -type query_spec() :: #select{}.
 
@@ -156,6 +171,16 @@ intersperse([X | Xs], I) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Serializes an SQL statement.
 -spec to_sql(sql_stmt()) -> Equery :: iodata().
+to_sql(start_transaction) ->
+  "BEGIN TRANSACTION;";
+to_sql(commit) ->
+  "COMMIT;";
+to_sql(commit_and_chain) ->
+  "COMMIT AND CHAIN;";
+to_sql(commit_and_no_chain) ->
+  "COMMIT AND NO CHAIN;";
+to_sql(rollback) ->
+  "ROLLBACK;";
 to_sql(#select{quantifier = Quant,
                columns = Columns,
                from = From,
