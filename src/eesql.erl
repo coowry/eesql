@@ -225,7 +225,7 @@ to_sql(P0, {sql_stmt, #insert{table = Table,
   {P1, {Values_Clause, Values_Parameters}} = 
     lists:foldl(fun(Row, {PI, {Accum_SQL, Accum_Params}}) ->
                     {PJ, {Pred_SQL, Pred_Params}} = to_sql(PI, {values, Row}),
-                    {PJ, {[Accum_SQL] ++ [Pred_SQL], Accum_Params ++ Pred_Params}}
+                    {PJ, {Accum_SQL ++ [Pred_SQL], Accum_Params ++ Pred_Params}}
                 end,
                 {P0, {[], []}},
                 Rows),
