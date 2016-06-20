@@ -55,7 +55,7 @@ insert_test() ->
   {Insert_AST, Params} = eesql:to_sql(#insert{table = preuser,
                                               columns = [c1, c2],
                                               values = [[<<"a">>,21],[<<"b">>,42]]}),
-  ?assertEqual([a,21,b,42], Params),
+  ?assertEqual([<<"a">>,21,<<"b">>,42], Params),
   ?assertEqual("INSERT INTO preuser (c1, c2) VALUES ($1, $2), ($3, $4) RETURNING *;",
                lists:flatten(io_lib:format("~s",[Insert_AST]))).
 
