@@ -51,12 +51,20 @@ delete_test() ->
   ?assertEqual("DELETE FROM preuser RETURNING *;",
                lists:flatten(io_lib:format("~s",[Delete_AST]))).
 
-insert_test() ->
+insert1_test() ->
   {Insert_AST, Params} = eesql:to_sql(#insert{table = preuser,
                                               columns = [c1, c2],
                                               values = [[<<"a">>,21],[<<"b">>,42]]}),
   ?assertEqual([<<"a">>,21,<<"b">>,42], Params),
   ?assertEqual("INSERT INTO preuser (c1, c2) VALUES ($1, $2), ($3, $4) RETURNING *;",
+               lists:flatten(io_lib:format("~s",[Insert_AST]))).
+
+insert2_test() ->
+  {Insert_AST, Params} = eesql:to_sql(#insert{table = preuser,
+                                              columns = [created, expired, fired, id, user_id],
+                                              values = [[11234, null, null, 1, <<"email@example.com">>]]}),
+  ?assertEqual([11234, 1, <<"email@example.com">>], Params),
+  ?assertEqual("INSERT INTO preuser (created, expired, fired, id, user_id) VALUES ($1, NULL, NULL, $2, $3) RETURNING *;",
                lists:flatten(io_lib:format("~s",[Insert_AST]))).
 
 update_test() ->
