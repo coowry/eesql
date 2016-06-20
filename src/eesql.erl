@@ -168,13 +168,13 @@ intersperse([X | Xs], I) ->
                    [],
                    Xs)].
 
--spec to_sql(sql_stmt()) -> {Pos, {Equery, Params}}
-                              when Pos :: pos_integer(),
-                                   Equery :: iodata(),
+-spec to_sql(sql_stmt()) -> {Equery, Params}
+                              when Equery :: iodata(),
                                    Params :: [literal()].
 to_sql(Statement) ->
   Position = 1,
-  to_sql(Position, {sql_stmt, Statement}).
+  {_Last_Pos, Result} = to_sql(Position, {sql_stmt, Statement}),
+  Result.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Serializes an SQL sentences.
@@ -182,7 +182,8 @@ to_sql(Statement) ->
              | {where, undefined | predicate()}
              | {predicate, predicate()}
              | {value_expr, value_expr()}
-             | {values, [literal()]})
+             | {values, [literal()]}
+             | {table_ref, table_ref()})
             -> {Pos, {Equery, Params}}
             when Pos :: pos_integer(),
                  Equery :: iodata(),
