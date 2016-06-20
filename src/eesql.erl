@@ -210,7 +210,7 @@ to_sql(P0, {sql_stmt, #select{quantifier = Quant,
       Items = intersperse([derived_col_to_sql(Column) || Column <- Columns], ", ")
   end,
   {P1, {Table_Ref_Clause, Table_Ref_Parameters}} = 
-    lists:foldl(fun(Table_Ref, {PI, Accum_SQL, Accum_Params}) ->
+    lists:foldl(fun(Table_Ref, {PI, {Accum_SQL, Accum_Params}}) ->
                     {PJ, {Table_Ref_SQL, Table_Ref_Params}} = to_sql(PI, {table_ref, Table_Ref}),
                     {PJ, {Accum_SQL ++ [Table_Ref_SQL], Accum_Params ++ Table_Ref_Params}}
                 end,
@@ -223,9 +223,9 @@ to_sql(P0, {sql_stmt, #insert{table = Table,
                               columns = Columns, 
                               values = Rows}}) ->
   {P1, {Values_Clause, Values_Parameters}} = 
-    lists:foldl(fun(Row, {PI, Accum_SQL, Accum_Params}) ->
+    lists:foldl(fun(Row, {PI, {Accum_SQL, Accum_Params}}) ->
                     {PJ, {Pred_SQL, Pred_Params}} = to_sql(PI, {values, Row}),
-                    {PJ, {[Accum_SQL] ++ [Pred_SQL], [Accum_Params] ++ [Pred_Params]}}
+                    {PJ, {[Accum_SQL] ++ [Pred_SQL], Accum_Params ++ Pred_Params}}
                 end,
                 {P0, {[], []}},
                 Rows),
@@ -238,9 +238,9 @@ to_sql(P0, {sql_stmt, #insert{table = Table,
 %% Serialize a values clause
 to_sql(P0, {values, Row}) ->
   {P1, {Values_Clause, Values_Parameters}} = 
-    lists:foldl(fun(Value, {PI, Accum_SQL, Accum_Params}) ->
+    lists:foldl(fun(Value, {PI, {Accum_SQL, Accum_Params}}) ->
                     {PJ, {Expr_SQL, Expr_Params}} = to_sql(PI, {value_expr, Value}),
-                    {PJ, {Accum_SQL ++ Expr_SQL, Accum_Params ++ Expr_Params}}
+                    {PJ, {Accum_SQL ++ [Expr_SQL], Accum_Params ++ Expr_Params}}
                 end,
                 {P0, {[], []}},
                 Row),
@@ -249,9 +249,9 @@ to_sql(P0, {sql_stmt, #update{table = Table,
                               set = Set,
                               where = Where}}) ->
   {P1, {Set_Clause, Set_Parameters}} = 
-    lists:foldl(fun({Column, Value}, {PI, Accum_SQL, Accum_Params}) ->
+    lists:foldl(fun({Column, Value}, {PI, {Accum_SQL, Accum_Params}}) ->
                     {PJ, {Expr_SQL, Expr_Params}} = to_sql(PI, {value_expr, Value}),
-                    {PJ, {[Accum_SQL] ++ [[name_to_sql(Column), " = ", Expr_SQL]], Accum_Params ++ Expr_Params}}
+                    {PJ, {Accum_SQL ++ [[name_to_sql(Column), " = ", Expr_SQL]], Accum_Params ++ Expr_Params}}
                 end,
                 {P0, {[], []}},
                 Set),
@@ -310,7 +310,7 @@ to_sql(P0, {predicate, {Logic_Bin_Op, [Pred1 | Predicates]}}) when Logic_Bin_Op 
                'or' -> " OR "
              end,
   {P1, {Pred1_SQL, Pred1_Params}} = to_sql(P0, {predicate, Pred1}),
-  lists:foldl(fun(Pred, {PI, Accum_SQL, Accum_Params}) ->
+  lists:foldl(fun(Pred, {PI, {Accum_SQL, Accum_Params}}) ->
                   {PJ, {Pred_SQL, Pred_Params}} = to_sql(PI, {predicate, Pred}),
                   {PJ, {[Accum_SQL, Operator, Pred_SQL], Accum_Params ++ Pred_Params}}
               end,
@@ -360,7 +360,7 @@ to_sql(P0, {value_expr, Value}) when is_binary(Value); is_integer(Value); is_flo
   {P0+1, {get_placeholder(P0), [Value]}};
 to_sql(P0, {value_expr, Values}) when is_list(Values) ->
   {P1, {Values_Clause, Values_Parameters}} = 
-    lists:foldl(fun(Value, {PI, Accum_SQL, Accum_Params}) ->
+    lists:foldl(fun(Value, {PI, {Accum_SQL, Accum_Params}}) ->
                     {PJ, {Expr_SQL, Expr_Params}} = to_sql(PI, {value_expr, Value}),
                     {PJ, {Accum_SQL ++ [Expr_SQL], Accum_Params ++ Expr_Params}}
                 end,
