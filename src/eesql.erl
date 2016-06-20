@@ -335,3 +335,89 @@ expr_to_sql(Values) when is_list(Values) ->
    intersperse([expr_to_sql(Value) || Value <- Values],
                ", "),
    "}"].
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% @doc Serializes an SQL sentences.
+-spec to_sql(Pos, {sql_stmt, sql_stmt()}
+                  | {where, undefined | predicate()}
+                  | {predicate, predicate()})
+                  | {value_expr, value_expr()})
+            -> {Pos, {Equery, Params}}
+            when Pos :: pos_integer(),
+                 Equery :: iodata(),
+                 Params :: [literal()].
+to_sql(Position, {sql_stmt, start_transaction}) ->
+  {Position, {"BEGIN TRANSACTION;", []}};
+to_sql(Position, {sql_stmt, commit}) ->
+  {Position, {"COMMIT;", []}};
+to_sql(Position, {sql_stmt, commit_and_chain}) ->
+  {Position, {"COMMIT AND CHAIN;", []}};
+to_sql(Position, {sql_stmt, commit_and_no_chain}) ->
+  {Position, {"COMMIT AND NO CHAIN;", []}};
+to_sql(Position, {sql_stmt, rollback}) ->
+  {Position, {"ROLLBACK;", []}};
+to_sql(P0, {sql_stmt, #select{quantifier = Quant,
+                              columns = Columns,
+                              from = From,
+                              where = Where}}) ->
+  Quant_SQL = set_quant_to_sql(Quant),
+  case Columns of
+    [] ->
+      Items = "*";
+    _ ->
+      Items = intersperse([derived_col_to_sql(Column) || Column <- Columns], ", ")
+  end,
+  From_Clause =
+    [" FROM ",
+     intersperse([table_ref_to_sql(Table_Ref) || Table_Ref <- From], ", ")],
+  {P1, {Where_Clause, Where_Parameters}} = to_sql(P0, {where, Where}),
+  {P1, {["SELECT ", Quant_SQL, " ", Items, From_Clause, Where_Clause, ";"], Where_Parameters}};
+%% Serialize a where clause
+to_sql(P0, {where, undefined}) ->
+  {P0, {"", []}};
+to_sql(P0, {where, Predicate}) ->
+  {P1, {Pred_SQL, Pred_Params}} = to_sql(P0, {predicate, Predicate}),
+  {P1, {[" WHERE ", Pred_SQL], Pred_Params}};
+%% Serialize a predicate
+-spec pred_to_sql(Predicate :: predicate()) -> iodata().
+to_sql(P0,{predicate, {'not', Predicate}}) ->
+  {P1, {Pred_SQL, Pred_Params}} = to_sql(P0, {predicate, Predicate}),
+  {P1, {["NOT ", Pred_SQL], Pred_Params}};
+to_sql(P0, {predicate, {Logic_Bin_Op, [Pred1 | Predicates]}})
+  when Logic_Bin_Op == 'and';
+       Logic_Bin_Op == 'or' ->
+  Operator = case Logic_Bin_Op of
+               'and' -> " AND ";
+               'or' -> " OR "
+             end,
+  {P1, {Pred1_SQL, Pred1_Params}} = to_sql(P0, {predicate, Pred1}),
+  lists:foldl(fun(Pred, {PI, Accum_SQL, Accum_Params}) ->
+                  {PJ, {Pred_SQL, Pred_Params}} = to_sql(PI, {predicate, Pred}),
+                  {PJ, {[Accum_SQL, Operator, Pred_SQL], Accum_Params ++ Pre_Params}}
+              end,
+              {P1, {Pred1_SQL, Pred1_Params}}
+              Predicates);
+%% pred_to_sql({is_null, Column}) ->
+%%   [name_to_sql(Column), " IS NULL"];
+to_sql(P0, {predicate, {Left, Bin_Op, Right}})
+  when Bin_Op == '=';
+       Bin_Op == '!=';
+       Bin_Op == '<>';
+       Bin_Op == '<';
+       Bin_Op == '>';
+       Bin_Op == '<=';
+       Bin_Op == '>=' ->
+  {P1, {Left_SQL, Left_Params}} = to_sql(P0, {value_expr, Left}),
+  {P2, {Right_SQL, Right_Params}} = to_sql(P1, {value_expr, Right}),
+  {P2, {[Left_SQL, " ", atom_to_binary(Bin_Op, utf8), " ", Right_SQL],
+        Left_Params ++ Right_Params}};
+%% pred_to_sql({Column, like, Match_String}) ->
+%%   [name_to_sql(Column), " LIKE ", "'", Match_String, "'"];
+%% pred_to_sql({exists, Select = #select{}}) ->
+%%   ["EXISTS ", "(", to_sql(Select), ")"];
+%% pred_to_sql({between, Expr, Min, Max}) ->
+%%   [expr_to_sql(Expr),
+%%    " BETWEEN ",
+%%    expr_to_sql(Min), " AND ", expr_to_sql(Max)];
+%% pred_to_sql({in, Expr, Select = #select{}}) ->
+%%   [expr_to_sql(Expr), " IN ", to_sql(Select)].
