@@ -66,7 +66,17 @@
 %% Any name (column name, table name, alias, ...)
 -type name() :: atom().
 
-%% <literal> (any SQL literal inspired by epgsql:bind_param())
+%% <literal> (any SQL literal, for the moment just inspired by epgsql:bind_param())
+%% <literal> ::= <signed numeric literal> | <general literal>
+%% <unsigned literal> ::= <unsigned numeric literal> | <general literal>
+%% <general literal> ::= 
+%%   <character string literal>
+%% | <national character string literal>
+%% | <Unicode character string literal>
+%% | <binary string literal>
+%% | <datetime literal>
+%% | <interval literal>
+%% | <boolean literal>
 -type literal() ::
         null
       | boolean()
@@ -125,9 +135,44 @@
       | {in, value_expr(), query_spec()}.
       %% | some, all, ...
 
-%% <value expr>
+%% <value expr> Over simplified for the moment.
+%% <value expr> ::= <common value expression> | <boolean value expression> | <row value expression>
+%% <common value expression> ::=
+%%   <numeric value expression>
+%% | <string value expression>
+%% | <datetime value expression>
+%% | <interval value expression>
+%% | <user-defined type value expression>
+%% | <reference value expression>
+%% | <collection value expression>
+%% <user-defined type value expression> ::= <value expression primary>
+%% <reference value expression> ::= <value expression primary>
+%% <collection value expression> ::=  <array value expression> | <multiset value expression>
+%% <collection value constructor> ::=  <array value constructor> | <multiset value constructor>
+%% <value expression primary> ::= <parenthesized value expression> | <nonparenthesized value expression primary>
+%% <parenthesized value expression> ::= <left paren> <value expression> <right paren>
+%% <nonparenthesized value expression primary> ::= 
+%%   <unsigned value specification>
+%% | <column reference>
+%% | <set function specification>
+%% | <window function>
+%% | <scalar subquery>
+%% | <case expression>
+%% | <cast specification>
+%% | <field reference>
+%% | <subtype treatment>
+%% | <method invocation>
+%% | <static method invocation>
+%% | <new specification>
+%% | <attribute or method reference>
+%% | <reference resolution>
+%% | <collection value constructor>
+%% | <array element reference>
+%% | <multiset element reference>
+%% | <routine invocation>
+%% | <next value expression>
 -type value_expr() ::
-        column_name()
+        column_name() %% <column reference>
       | literal().
 
 %% Binary operators
@@ -145,6 +190,7 @@
 %% SELECT <query specification>
 -type query_spec() :: #select{}.
 
+%% <from clause>
 -type from_clause() :: nonempty_list(table_ref()).
 
 %% INSERT <insert statement>
@@ -177,17 +223,19 @@ to_sql(Statement) ->
   Result.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% @doc Serializes an SQL sentences.
--spec to_sql(Pos, {sql_stmt, sql_stmt()}
-             | {where, undefined | predicate()}
+%% @doc Serializes SQL (sub)sentences.
+-spec to_sql(Pos,
+               {sql_stmt, sql_stmt()}
+             | {where_clause, undefined | predicate()}
              | {predicate, predicate()}
              | {value_expr, value_expr()}
-             | {values, [literal()]}
+             | {value_expr_list, [literal()]}
              | {table_ref, table_ref()})
             -> {Pos, {Equery, Params}}
             when Pos :: pos_integer(),
                  Equery :: iodata(),
                  Params :: [literal()].
+%% Serialize SQL statement
 to_sql(Position, {sql_stmt, start_transaction}) ->
   {Position, {"BEGIN TRANSACTION;", []}};
 to_sql(Position, {sql_stmt, commit}) ->
@@ -216,7 +264,7 @@ to_sql(P0, {sql_stmt, #select{quantifier = Quant,
                 end,
                 {P0, {[], []}},
                 From),
-  {P2, {Where_Clause, Where_Parameters}} = to_sql(P1, {where, Where}),
+  {P2, {Where_Clause, Where_Parameters}} = to_sql(P1, {where_clause, Where}),
   {P2, {["SELECT ", Quant_SQL, " ", Items, [" FROM ", intersperse(Table_Ref_Clause, ", ")], Where_Clause, ";"], 
         Table_Ref_Parameters ++ Where_Parameters}};
 to_sql(P0, {sql_stmt, #insert{table = Table, 
@@ -224,7 +272,7 @@ to_sql(P0, {sql_stmt, #insert{table = Table,
                               values = Rows}}) ->
   {P1, {Values_Clause, Values_Parameters}} = 
     lists:foldl(fun(Row, {PI, {Accum_SQL, Accum_Params}}) ->
-                    {PJ, {Pred_SQL, Pred_Params}} = to_sql(PI, {values, Row}),
+                    {PJ, {Pred_SQL, Pred_Params}} = to_sql(PI, {value_expr_list, Row}),
                     {PJ, {[Accum_SQL] ++ [Pred_SQL], Accum_Params ++ Pred_Params}}
                 end,
                 {P0, {[], []}},
@@ -235,16 +283,6 @@ to_sql(P0, {sql_stmt, #insert{table = Table,
          " VALUES ",
          intersperse(Values_Clause, ", "),
          " RETURNING *;"], Values_Parameters}};
-%% Serialize a values clause
-to_sql(P0, {values, Row}) ->
-  {P1, {Values_Clause, Values_Parameters}} = 
-    lists:foldl(fun(Value, {PI, {Accum_SQL, Accum_Params}}) ->
-                    {PJ, {Expr_SQL, Expr_Params}} = to_sql(PI, {value_expr, Value}),
-                    {PJ, {Accum_SQL ++ [Expr_SQL], Accum_Params ++ Expr_Params}}
-                end,
-                {P0, {[], []}},
-                Row),
-  {P1, {["(", intersperse(Values_Clause, ", "), ")"], Values_Parameters}};
 to_sql(P0, {sql_stmt, #update{table = Table,
                               set = Set,
                               where = Where}}) ->
@@ -255,7 +293,7 @@ to_sql(P0, {sql_stmt, #update{table = Table,
                 end,
                 {P0, {[], []}},
                 Set),
-  {P2, {Where_Clause, Where_Parameters}} = to_sql(P1, {where, Where}),
+  {P2, {Where_Clause, Where_Parameters}} = to_sql(P1, {where_clause, Where}),
   {P2, {["UPDATE ",
          name_to_sql(Table),
          " SET ",
@@ -264,9 +302,20 @@ to_sql(P0, {sql_stmt, #update{table = Table,
          " RETURNING *;"], Set_Parameters ++ Where_Parameters}};
 to_sql(P0, {sql_stmt, #delete{table = Table,
                               where = Where}}) ->
-  {P1, {Where_Clause, Where_Parameters}} = to_sql(P0, {where, Where}),
+  {P1, {Where_Clause, Where_Parameters}} = to_sql(P0, {where_clause, Where}),
   {P1, {["DELETE FROM ", name_to_sql(Table), Where_Clause, " RETURNING *;"], Where_Parameters}};
-%% Serialize a table ref clause
+%% Serialize <contextually typed row value expression list>
+%% Serialize a values clause
+to_sql(P0, {value_expr_list, Row}) ->
+  {P1, {Values_Clause, Values_Parameters}} = 
+    lists:foldl(fun(Value, {PI, {Accum_SQL, Accum_Params}}) ->
+                    {PJ, {Expr_SQL, Expr_Params}} = to_sql(PI, {value_expr, Value}),
+                    {PJ, {Accum_SQL ++ [Expr_SQL], Accum_Params ++ Expr_Params}}
+                end,
+                {P0, {[], []}},
+                Row),
+  {P1, {["(", intersperse(Values_Clause, ", "), ")"], Values_Parameters}};
+%% Serialize <table reference>
 to_sql(P0, {table_ref, #join{type = Type,
                              left = Left,
                              right = Right,
@@ -293,13 +342,13 @@ to_sql(P0, {table_ref, {Table_Name, Correlation_Name}}) ->
         []}};
 to_sql(P0, {table_ref, Table_Name}) ->
   {P0, {atom_to_binary(Table_Name, utf8), []}};
-%% Serialize a where clause
-to_sql(P0, {where, undefined}) ->
+%% Serialize <where clause>
+to_sql(P0, {where_clause, undefined}) ->
   {P0, {"", []}};
-to_sql(P0, {where, Predicate}) ->
+to_sql(P0, {where_clause, Predicate}) ->
   {P1, {Pred_SQL, Pred_Params}} = to_sql(P0, {predicate, Predicate}),
   {P1, {[" WHERE ", Pred_SQL], Pred_Params}};
-%% Serialize a predicate
+%% Serialize <predicate>
 to_sql(P0, {predicate, {'not', Predicate}}) ->
   {P1, {Pred_SQL, Pred_Params}} = to_sql(P0, {predicate, Predicate}),
   {P1, {["NOT ", Pred_SQL], Pred_Params}};
