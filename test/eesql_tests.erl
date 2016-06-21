@@ -36,6 +36,18 @@ select_theta_test() ->
   ?assertEqual("SELECT ALL users.name, emails.address FROM users, emails WHERE users.id = emails.id;",
                lists:flatten(io_lib:format("~s",[Select_AST]))).
 
+select_and_test() ->
+  {Select_AST, Params} = eesql:to_sql(#select{
+                                         columns=['users.name','emails.address'],
+                                         from = [users,emails],
+                                         where= {'and', [{'users.id', '=', 'emails.id'},
+                                                         {'emails.valid', '=', true},
+                                                         {'emails.id', like, <<"a.*">>}]}
+                                        }),
+  ?assertEqual([<<"a.*">>], Params),
+  ?assertEqual("SELECT ALL users.name, emails.address FROM users, emails WHERE users.id = emails.id AND emails.valid = TRUE AND emails.id LIKE $1;",
+               lists:flatten(io_lib:format("~s",[Select_AST]))).
+
 select_gt_test() ->
   {Select_AST, Params} = eesql:to_sql(#select{
                                          from = [users],

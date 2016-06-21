@@ -128,7 +128,6 @@
       | {'and', [predicate()]}
       | {'or', [predicate()]}
       | {value_expr(), binop(), value_expr()}
-      | {column_name(), like, binary()}
       | {is_null, column_name()}
       | {exists, query_spec()}
       | {between, value_expr(), value_expr(), value_expr()}
@@ -379,14 +378,16 @@ to_sql(P0, {predicate, {Left, Bin_Op, Right}})
        Bin_Op == '<';
        Bin_Op == '>';
        Bin_Op == '<=';
-       Bin_Op == '>=' ->
+       Bin_Op == '>=';
+       Bin_Op == like ->
+  Bin_Op_SQL =
+    if Bin_Op == like -> <<"LIKE">>;
+       true -> atom_to_binary(Bin_Op, utf8)
+    end,
   {P1, {Left_SQL, Left_Params}} = to_sql(P0, {value_expr, Left}),
   {P2, {Right_SQL, Right_Params}} = to_sql(P1, {value_expr, Right}),
-  {P2, {[Left_SQL, " ", atom_to_binary(Bin_Op, utf8), " ", Right_SQL],
+  {P2, {[Left_SQL, " ", Bin_Op_SQL, " ", Right_SQL],
         Left_Params ++ Right_Params}};
-to_sql(P0, {predicate, {Column, like, Match_String}}) ->
-  {P1, {Expr_SQL, Expr_Params}} = to_sql(P0, {value_expr, Match_String}),
-  {P1, {[name_to_sql(Column), " LIKE ", "'", Expr_SQL, "'"], Expr_Params}};
 to_sql(P0, {predicate, {exists, Select = #select{}}}) ->
   {P1, {Select_Clause, Select_Parameters}} = to_sql(P0, {sql_stmt, Select}),
   {P1, {["EXISTS ", "(", Select_Clause, ")"], Select_Parameters}};
@@ -431,7 +432,7 @@ to_sql(P0, {value_expr, Literal}) ->
 %% Serialize a literal
 to_sql(P0, {literal, null}) ->
   {P0, {<<"NULL">>, []}};
-to_sql(P0, {litearl, true}) ->
+to_sql(P0, {literal, true}) ->
   {P0, {<<"TRUE">>, []}};
 to_sql(P0, {literal, false}) ->
   {P0, {<<"FALSE">>, []}};
