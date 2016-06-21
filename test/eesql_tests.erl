@@ -45,6 +45,15 @@ select_gt_test() ->
   ?assertEqual("SELECT ALL * FROM users WHERE created > $1;",
                lists:flatten(io_lib:format("~s",[Select_AST]))).
 
+select_function_test() ->
+  {Select_AST, Params} = eesql:to_sql(#select{
+                                         from = [users],
+                                         where= {created, '>', {<<"POWER">>, [1459286860,1]}}
+                                        }),
+  ?assertEqual([1459286860,1], Params),
+  ?assertEqual("SELECT ALL * FROM users WHERE created > POWER($1, $2);",
+               lists:flatten(io_lib:format("~s",[Select_AST]))).
+
 delete_test() ->
   {Delete_AST, Params} = eesql:to_sql(#delete{table = preuser}),
   ?assertEqual([], Params),

@@ -88,7 +88,7 @@
       %% | calendar:time() %actualy, `Seconds' may be float()
       %% | calendar:datetime()
       %% | {calendar:time(), Days::non_neg_integer(), Months::non_neg_integer()}
-      | [literal()]. %array (maybe nested)
+      .
 
 %% <table name>
 -type table_name() :: name().
@@ -135,7 +135,7 @@
       | {in, value_expr(), query_spec()}.
       %% | some, all, ...
 
-%% <value expr> Over simplified for the moment.
+%% <value expr> over-simplified for the moment.
 %% <value expr> ::= <common value expression> | <boolean value expression> | <row value expression>
 %% <common value expression> ::=
 %%   <numeric value expression>
@@ -173,7 +173,12 @@
 %% | <next value expression>
 -type value_expr() ::
         column_name() %% <column reference>
+      | {function_name(), [value_expr()]} %% Represents function calls (a lot of clauses such us <fold>, <trim>, <natural logarithm>, ...
+      | [value_expr()] % Array (maybe nested)
       | literal().
+
+%% Supported function names
+-type function_name() :: binary(). %% Function names such as UPPER, LOWER, POWER, ABS...
 
 %% Binary operators
 -type binop() :: '=' | '!=' | '<' | '>' | '<=' | '>=' | like.
@@ -396,26 +401,44 @@ to_sql(P0, {predicate, {in, Expr, Select = #select{}}}) ->
   {P1, {Expr_SQL, Expr_Params}} = to_sql(P0, {value_expr, Expr}),
   {P2, {Select_SQL, Select_Params}} = to_sql(P1, {sql_stmt, Select}),
   {P2, {[Expr_SQL, " IN ", Select_SQL], Expr_Params ++ Select_Params}};
-%% Serialize a expression clause
-to_sql(P0, {value_expr, null}) ->
-  {P0, {<<"NULL">>, []}};
-to_sql(P0, {value_expr, true}) ->
-  {P0, {<<"TRUE">>, []}};
-to_sql(P0, {value_expr, false}) ->
-  {P0, {<<"FALSE">>, []}};
-to_sql(P0, {value_expr, Column}) when is_atom(Column) ->
+%% Serialize a value expression
+to_sql(P0, {value_expr, Column}) when is_atom(Column),
+                                      Column /= null,
+                                      Column /= true,
+                                      Column /= false ->
   {P0, {name_to_sql(Column), []}};
-to_sql(P0, {value_expr, Value}) when is_binary(Value); is_integer(Value); is_float(Value) ->
-  {P0+1, {get_placeholder(P0), [Value]}};
-to_sql(P0, {value_expr, Values}) when is_list(Values) ->
-  {P1, {Values_Clause, Values_Parameters}} = 
-    lists:foldl(fun(Value, {PI, {Accum_SQL, Accum_Params}}) ->
+to_sql(P0, {value_expr, {Function_Name, Actual_Args}})
+  when is_binary(Function_Name) ->
+  {P1, {Args_SQLs, Args_Params}} = 
+    lists:foldl(fun(Value, {PI, {Accum_SQLs, Accum_Params}}) ->
                     {PJ, {Expr_SQL, Expr_Params}} = to_sql(PI, {value_expr, Value}),
-                    {PJ, {Accum_SQL ++ [Expr_SQL], Accum_Params ++ Expr_Params}}
+                    {PJ, {Accum_SQLs ++ [Expr_SQL], Accum_Params ++ Expr_Params}}
                 end,
                 {P0, {[], []}},
-                Values),
-  {P1, {["{", intersperse(Values_Clause, ", "), "}"], Values_Parameters}}.
+                Actual_Args),
+  {P1, {[Function_Name, "(", intersperse(Args_SQLs, ", "), ")"], Args_Params}};
+to_sql(P0, {value_expr, Value_Exprs}) when is_list(Value_Exprs) ->
+  {P1, {Values_SQLs, Values_Params}} = 
+    lists:foldl(fun(Value, {PI, {Accum_SQLs, Accum_Params}}) ->
+                    {PJ, {Expr_SQL, Expr_Params}} = to_sql(PI, {value_expr, Value}),
+                    {PJ, {Accum_SQLs ++ [Expr_SQL], Accum_Params ++ Expr_Params}}
+                end,
+                {P0, {[], []}},
+                Value_Exprs),
+  {P1, {["{", intersperse(Values_SQLs, ", "), "}"], Values_Params}};
+to_sql(P0, {value_expr, Literal}) ->
+  to_sql(P0, {literal, Literal});
+%% Serialize a literal
+to_sql(P0, {literal, null}) ->
+  {P0, {<<"NULL">>, []}};
+to_sql(P0, {litearl, true}) ->
+  {P0, {<<"TRUE">>, []}};
+to_sql(P0, {literal, false}) ->
+  {P0, {<<"FALSE">>, []}};
+to_sql(P0, {literal, Value}) when is_binary(Value);
+                                  is_integer(Value);
+                                  is_float(Value) ->
+  {P0+1, {get_placeholder(P0), [Value]}}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Serialize set quantifier
