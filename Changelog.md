@@ -4,6 +4,13 @@
 
 ## Next release
 
+## v0.3.0
+
+- This library now uses placeholders.
+- The input remains the same, but returns a tuple,
+  with the statement and the parameters.
+- New tests. Old tests adapted.
+
 ## v0.2.1
 
 - New statements added: <start transaction statement>,
