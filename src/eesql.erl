@@ -233,8 +233,9 @@ to_sql(Statement) ->
              | {where_clause, undefined | predicate()}
              | {predicate, predicate()}
              | {value_expr, value_expr()}
-             | {value_expr_list, [literal()]}
-             | {table_ref, table_ref()})
+             | {value_expr_list, [value_expr()]}
+             | {table_ref, table_ref()}
+             | {literal, literal()})
             -> {Pos, {Equery, Params}}
             when Pos :: pos_integer(),
                  Equery :: iodata(),
