@@ -4,6 +4,7 @@
 
 ## Next release
 
+- LIMIT/OFFSET clause added to SELECT (no standard).
 - ORDER BY clause added to SELECT (<sort specification>).
 
 ## v0.3.0
