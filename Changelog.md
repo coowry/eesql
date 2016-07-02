@@ -4,6 +4,8 @@
 
 ## Next release
 
+- ORDER BY clause added to SELECT (<sort specification>).
+
 ## v0.3.0
 
 - This library now uses placeholders.
