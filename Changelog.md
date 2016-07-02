@@ -4,6 +4,7 @@
 
 ## Next release
 
+- Refactor some folds applying to_sql to lists of clauses.
 - OFFSET/FETCH clause added to SELECT (introduced in SQL in 2008).
 - ORDER BY clause added to SELECT (<sort specification>).
 

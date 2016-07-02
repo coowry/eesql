@@ -271,12 +271,7 @@ to_sql(P0, {sql_stmt, #select{quantifier = Quant,
       Items = intersperse([derived_col_to_sql(Column) || Column <- Columns], ", ")
   end,
   {P1, {Table_Ref_Clauses, Table_Ref_Parameters}} = 
-    lists:foldl(fun(Table_Ref, {PI, {Accum_SQL, Accum_Params}}) ->
-                    {PJ, {Table_Ref_SQL, Table_Ref_Params}} = to_sql(PI, {table_ref, Table_Ref}),
-                    {PJ, {Accum_SQL ++ [Table_Ref_SQL], Accum_Params ++ Table_Ref_Params}}
-                end,
-                {P0, {[], []}},
-                From),
+    to_sql_fold(P0, table_ref, From),
   {P2, {Where_Clause, Where_Parameters}} = to_sql(P1, {where_clause, Where}),
   {P3, {Sort_Spec_Clauses, Sort_Specs_Parameters}} =
     to_sql_fold(P2, sort_spec, Sort_Specs),
@@ -296,13 +291,8 @@ to_sql(P0, {sql_stmt, #select{quantifier = Quant,
 to_sql(P0, {sql_stmt, #insert{table = Table, 
                               columns = Columns, 
                               values = Rows}}) ->
-  {P1, {Values_Clause, Values_Parameters}} = 
-    lists:foldl(fun(Row, {PI, {Accum_SQL, Accum_Params}}) ->
-                    {PJ, {Pred_SQL, Pred_Params}} = to_sql(PI, {value_expr_list, Row}),
-                    {PJ, {Accum_SQL ++ [Pred_SQL], Accum_Params ++ Pred_Params}}
-                end,
-                {P0, {[], []}},
-                Rows),
+  {P1, {Values_Clause, Values_Parameters}} =
+    to_sql_fold(P0, value_expr_list, Rows),
   {P1, {["INSERT INTO ",
          name_to_sql(Table),
          " (", intersperse([name_to_sql(Column) || Column <- Columns], ", "), ")",
@@ -313,6 +303,7 @@ to_sql(P0, {sql_stmt, #update{table = Table,
                               set = Set,
                               where = Where}}) ->
   {P1, {Set_Clause, Set_Parameters}} = 
+    %% TODO: cannot be easily factored into to_sql_fold
     lists:foldl(fun({Column, Value}, {PI, {Accum_SQL, Accum_Params}}) ->
                     {PJ, {Expr_SQL, Expr_Params}} = to_sql(PI, {value_expr, Value}),
                     {PJ, {Accum_SQL ++ [[name_to_sql(Column), " = ", Expr_SQL]], Accum_Params ++ Expr_Params}}
@@ -334,12 +325,7 @@ to_sql(P0, {sql_stmt, #delete{table = Table,
 %% Serialize a values clause
 to_sql(P0, {value_expr_list, Row}) ->
   {P1, {Values_Clause, Values_Parameters}} = 
-    lists:foldl(fun(Value, {PI, {Accum_SQL, Accum_Params}}) ->
-                    {PJ, {Expr_SQL, Expr_Params}} = to_sql(PI, {value_expr, Value}),
-                    {PJ, {Accum_SQL ++ [Expr_SQL], Accum_Params ++ Expr_Params}}
-                end,
-                {P0, {[], []}},
-                Row),
+    to_sql_fold(P0, value_expr, Row),
   {P1, {["(", intersperse(Values_Clause, ", "), ")"], Values_Parameters}};
 %% Serialize <table reference>
 to_sql(P0, {table_ref, #join{type = Type,
@@ -422,6 +408,7 @@ to_sql(P0, {predicate, {Logic_Bin_Op, [Pred1 | Predicates]}}) when Logic_Bin_Op 
                'or' -> " OR "
              end,
   {P1, {Pred1_SQL, Pred1_Params}} = to_sql(P0, {predicate, Pred1}),
+  %% TODO: cannot be easily factored into to_sql_fold
   lists:foldl(fun(Pred, {PI, {Accum_SQL, Accum_Params}}) ->
                   {PJ, {Pred_SQL, Pred_Params}} = to_sql(PI, {predicate, Pred}),
                   {PJ, {[Accum_SQL, Operator, Pred_SQL], Accum_Params ++ Pred_Params}}
@@ -470,21 +457,11 @@ to_sql(P0, {value_expr, Column}) when is_atom(Column),
 to_sql(P0, {value_expr, {Function_Name, Actual_Args}})
   when is_binary(Function_Name) ->
   {P1, {Args_SQLs, Args_Params}} = 
-    lists:foldl(fun(Value, {PI, {Accum_SQLs, Accum_Params}}) ->
-                    {PJ, {Expr_SQL, Expr_Params}} = to_sql(PI, {value_expr, Value}),
-                    {PJ, {Accum_SQLs ++ [Expr_SQL], Accum_Params ++ Expr_Params}}
-                end,
-                {P0, {[], []}},
-                Actual_Args),
+    to_sql_fold(P0, value_expr, Actual_Args),
   {P1, {[Function_Name, "(", intersperse(Args_SQLs, ", "), ")"], Args_Params}};
 to_sql(P0, {value_expr, Value_Exprs}) when is_list(Value_Exprs) ->
   {P1, {Values_SQLs, Values_Params}} = 
-    lists:foldl(fun(Value, {PI, {Accum_SQLs, Accum_Params}}) ->
-                    {PJ, {Expr_SQL, Expr_Params}} = to_sql(PI, {value_expr, Value}),
-                    {PJ, {Accum_SQLs ++ [Expr_SQL], Accum_Params ++ Expr_Params}}
-                end,
-                {P0, {[], []}},
-                Value_Exprs),
+    to_sql_fold(P0, value_expr, Value_Exprs),
   {P1, {["{", intersperse(Values_SQLs, ", "), "}"], Values_Params}};
 to_sql(P0, {value_expr, Literal}) ->
   to_sql(P0, {literal, Literal});
