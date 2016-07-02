@@ -4,6 +4,7 @@
 
 ## Next release
 
+- OFFSET/FETCH clause added to SELECT (introduced in SQL in 2008).
 - ORDER BY clause added to SELECT (<sort specification>).
 
 ## v0.3.0
