@@ -53,7 +53,7 @@ select_order_by_test() ->
                                          columns=['users.name','emails.address'],
                                          from = [users,emails],
                                          where = {'users.id','=','emails.id'},
-                                         order_by = 'users.name'
+                                         order_by = ['users.name']
                                         }),
   ?assertEqual([], Params),
   ?assertEqual("SELECT ALL users.name, emails.address FROM users, emails WHERE users.id = emails.id ORDER BY users.name;",
@@ -64,7 +64,7 @@ select_order_by_asc_last_test() ->
                                          columns=['users.name','emails.address'],
                                          from = [users,emails],
                                          where = {'users.id','=','emails.id'},
-                                         order_by = {'users.name', asc, last}
+                                         order_by = [{'users.name', asc, last}]
                                         }),
   ?assertEqual([], Params),
   ?assertEqual("SELECT ALL users.name, emails.address FROM users, emails WHERE users.id = emails.id ORDER BY users.name ASC NULLS LAST;",
@@ -75,7 +75,7 @@ select_order_by_desc_test() ->
                                          columns=['users.name','emails.address'],
                                          from = [users,emails],
                                          where = {'users.id','=','emails.id'},
-                                         order_by = {'users.name', desc}
+                                         order_by = [{'users.name', desc}]
                                         }),
   ?assertEqual([], Params),
   ?assertEqual("SELECT ALL users.name, emails.address FROM users, emails WHERE users.id = emails.id ORDER BY users.name DESC;",
@@ -86,10 +86,22 @@ select_order_by_first_test() ->
                                          columns=['users.name','emails.address'],
                                          from = [users,emails],
                                          where = {'users.id','=','emails.id'},
-                                         order_by = {'users.name', first}
+                                         order_by = [{'users.name', first}]
                                         }),
   ?assertEqual([], Params),
   ?assertEqual("SELECT ALL users.name, emails.address FROM users, emails WHERE users.id = emails.id ORDER BY users.name NULLS FIRST;",
+               lists:flatten(io_lib:format("~s",[Select_AST]))).
+
+select_order_by_2_test() ->
+  {Select_AST, Params} = eesql:to_sql(#select{
+                                         columns=['users.name','emails.address'],
+                                         from = [users,emails],
+                                         where = {'users.id','=','emails.id'},
+                                         order_by = [{'users.name', first},
+                                                     {'emails.id', asc}]
+                                        }),
+  ?assertEqual([], Params),
+  ?assertEqual("SELECT ALL users.name, emails.address FROM users, emails WHERE users.id = emails.id ORDER BY users.name NULLS FIRST, emails.id ASC;",
                lists:flatten(io_lib:format("~s",[Select_AST]))).
 
 select_gt_test() ->
