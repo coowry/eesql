@@ -261,7 +261,8 @@ to_sql(P0, {sql_stmt, #select{quantifier = Quant,
                               columns = Columns,
                               from = From,
                               where = Where,
-                              order_by = Sort_Specs}}) ->
+                              order_by = Sort_Specs,
+                              offset = Offset}}) ->
   Quant_SQL = set_quant_to_sql(Quant),
   case Columns of
     [] ->
@@ -284,12 +285,14 @@ to_sql(P0, {sql_stmt, #select{quantifier = Quant,
       [] -> "";
       _ -> [" ORDER BY ", intersperse(Sort_Spec_Clauses, ", ")]
     end,
-  {P3, {["SELECT ", Quant_SQL, " ", Items,
+  {P4, {Offset_Clause, Offset_Params}} = to_sql(P3, {offset, Offset}),
+  {P4, {["SELECT ", Quant_SQL, " ", Items,
          [" FROM ", intersperse(Table_Ref_Clauses, ", ")],
          Where_Clause,
          Order_By_Clause,
+         Offset_Clause,
          ";"], 
-        Table_Ref_Parameters ++ Where_Parameters ++ Sort_Specs_Parameters}};
+        Table_Ref_Parameters ++ Where_Parameters ++ Sort_Specs_Parameters ++ Offset_Params}};
 to_sql(P0, {sql_stmt, #insert{table = Table, 
                               columns = Columns, 
                               values = Rows}}) ->
@@ -393,6 +396,21 @@ to_sql(P0, {sort_spec, {Value, last}}) ->
   {P1, {[Value_SQL, " NULLS LAST"], Value_Params}};
 to_sql(P0, {sort_spec, Value}) ->
   to_sql(P0, {value_expr, Value});
+%% Serialize offset/fetch
+to_sql(P0, {offset, undefined}) ->
+  {P0, {"", []}};
+to_sql(P0, {offset, {Start, Count}}) ->
+  {P1, {Start_SQL, Start_Params}} = to_sql(P0, {value_expr, Start}),
+  {P2, {Count_SQL, Count_Params}} = to_sql(P1, {value_expr, Count}),
+  {P2, {[" OFFSET (", Start_SQL, ") FETCH NEXT (", Count_SQL, ") ROWS ONLY"],
+        Start_Params ++ Count_Params}};
+to_sql(P0, {offset, {Value, Order, Nulls}}) ->
+  {P1, {Value_SQL, Value_Params}} = to_sql(P0, {value_expr, Value}),
+  {P1, {[Value_SQL, " ",
+         case Order of asc -> "ASC"; desc -> "DESC" end,
+         " NULLS ",
+         case Nulls of last -> "LAST"; first -> "FIRST" end],
+       Value_Params}};
 %% Serialize <predicate>
 to_sql(P0, {predicate, {'not', Predicate}}) ->
   {P1, {Pred_SQL, Pred_Params}} = to_sql(P0, {predicate, Predicate}),
