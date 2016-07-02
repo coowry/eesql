@@ -5,15 +5,19 @@
 %%
 %% See LICENSE.txt file in src directory for detailed information.
 %%
-%% This HRL contains records to represent PG SQL Abstract Syntax Tree.
-
+%% This HRL contains records to represent PG SQL Abstract Syntax
+%% Tree. Non-terminal symbols of the grammar are referenced according
+%% to http://savage.net.au/SQL/sql-2003-2.bnf.html
 -record(
    select,
    {
-     quantifier = all :: eesql:set_quant(),
-     columns = [] :: list(eesql:derived_column()), %% List of columns to retrieve, * as []
-     from :: eesql:from_clause(), %% (FROM) Source of data, table names for the moment
-     where :: eesql:predicate() %% (WHERE) search condition
+     quantifier = all :: eesql:set_quant(), %% <set quantifier>
+     columns = [] :: list(eesql:derived_column()), %% List of columns to retrieve, * as [] (<select list>)
+     %% <table expression> from here
+     from :: eesql:from_clause(), %% (FROM) Source of data, table names for the moment (<from clause>)
+     where :: eesql:predicate(), %% (WHERE) search condition (<where clause>)
+     order_by = [] :: list(eesql:sort_spec()), %% (ORDER BY) Sort specification (<sort specification list>)
+     offset :: undefined | {pos_integer(), pos_integer()} %% (OFFSET/FETCH)
    }
   ).
 

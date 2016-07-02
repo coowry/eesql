@@ -40,12 +40,81 @@ select_and_test() ->
   {Select_AST, Params} = eesql:to_sql(#select{
                                          columns=['users.name','emails.address'],
                                          from = [users,emails],
-                                         where= {'and', [{'users.id', '=', 'emails.id'},
-                                                         {'emails.valid', '=', true},
-                                                         {'emails.id', like, <<"a.*">>}]}
+                                         where = {'and', [{'users.id', '=', 'emails.id'},
+                                                          {'emails.valid', '=', true},
+                                                          {'emails.id', like, <<"a.*">>}]}
                                         }),
   ?assertEqual([<<"a.*">>], Params),
   ?assertEqual("SELECT ALL users.name, emails.address FROM users, emails WHERE users.id = emails.id AND emails.valid = TRUE AND emails.id LIKE $1;",
+               lists:flatten(io_lib:format("~s",[Select_AST]))).
+
+select_order_by_test() ->
+  {Select_AST, Params} = eesql:to_sql(#select{
+                                         columns=['users.name','emails.address'],
+                                         from = [users,emails],
+                                         where = {'users.id','=','emails.id'},
+                                         order_by = ['users.name']
+                                        }),
+  ?assertEqual([], Params),
+  ?assertEqual("SELECT ALL users.name, emails.address FROM users, emails WHERE users.id = emails.id ORDER BY users.name;",
+               lists:flatten(io_lib:format("~s",[Select_AST]))).
+
+select_order_by_asc_last_test() ->
+  {Select_AST, Params} = eesql:to_sql(#select{
+                                         columns=['users.name','emails.address'],
+                                         from = [users,emails],
+                                         where = {'users.id','=','emails.id'},
+                                         order_by = [{'users.name', asc, last}]
+                                        }),
+  ?assertEqual([], Params),
+  ?assertEqual("SELECT ALL users.name, emails.address FROM users, emails WHERE users.id = emails.id ORDER BY users.name ASC NULLS LAST;",
+               lists:flatten(io_lib:format("~s",[Select_AST]))).
+
+select_order_by_desc_test() ->
+  {Select_AST, Params} = eesql:to_sql(#select{
+                                         columns=['users.name','emails.address'],
+                                         from = [users,emails],
+                                         where = {'users.id','=','emails.id'},
+                                         order_by = [{'users.name', desc}]
+                                        }),
+  ?assertEqual([], Params),
+  ?assertEqual("SELECT ALL users.name, emails.address FROM users, emails WHERE users.id = emails.id ORDER BY users.name DESC;",
+               lists:flatten(io_lib:format("~s",[Select_AST]))).
+
+select_order_by_first_test() ->
+  {Select_AST, Params} = eesql:to_sql(#select{
+                                         columns=['users.name','emails.address'],
+                                         from = [users,emails],
+                                         where = {'users.id','=','emails.id'},
+                                         order_by = [{'users.name', first}]
+                                        }),
+  ?assertEqual([], Params),
+  ?assertEqual("SELECT ALL users.name, emails.address FROM users, emails WHERE users.id = emails.id ORDER BY users.name NULLS FIRST;",
+               lists:flatten(io_lib:format("~s",[Select_AST]))).
+
+select_order_by_2_test() ->
+  {Select_AST, Params} = eesql:to_sql(#select{
+                                         columns=['users.name','emails.address'],
+                                         from = [users,emails],
+                                         where = {'users.id','=','emails.id'},
+                                         order_by = [{'users.name', first},
+                                                     {'emails.id', asc}]
+                                        }),
+  ?assertEqual([], Params),
+  ?assertEqual("SELECT ALL users.name, emails.address FROM users, emails WHERE users.id = emails.id ORDER BY users.name NULLS FIRST, emails.id ASC;",
+               lists:flatten(io_lib:format("~s",[Select_AST]))).
+
+select_offset_test() ->
+  {Select_AST, Params} = eesql:to_sql(#select{
+                                         columns=['users.name','emails.address'],
+                                         from = [users,emails],
+                                         where = {'users.id','=','emails.id'},
+                                         order_by = [{'users.name', first},
+                                                     {'emails.id', asc}],
+                                         offset = {120, 20}
+                                        }),
+  ?assertEqual([120, 20], Params),
+  ?assertEqual("SELECT ALL users.name, emails.address FROM users, emails WHERE users.id = emails.id ORDER BY users.name NULLS FIRST, emails.id ASC OFFSET ($1) FETCH NEXT ($2) ROWS ONLY;",
                lists:flatten(io_lib:format("~s",[Select_AST]))).
 
 select_gt_test() ->

@@ -34,6 +34,7 @@
     set_quant/0,
     sql_stmt/0,
     start_trans_stmt/0,
+    sort_spec/0,
     table_name/0,
     table_ref/0,
     update_stmt/0,
@@ -197,6 +198,11 @@
 %% <from clause>
 -type from_clause() :: nonempty_list(table_ref()).
 
+%% <sort specification>
+-type sort_spec() :: {value_expr(), asc | desc, last | first}
+                   | {value_expr(), asc | desc | last | first}
+                   | value_expr().
+
 %% INSERT <insert statement>
 -type insert_stmt() :: #insert{}.
 
@@ -254,7 +260,9 @@ to_sql(Position, {sql_stmt, rollback}) ->
 to_sql(P0, {sql_stmt, #select{quantifier = Quant,
                               columns = Columns,
                               from = From,
-                              where = Where}}) ->
+                              where = Where,
+                              order_by = Sort_Specs,
+                              offset = Offset}}) ->
   Quant_SQL = set_quant_to_sql(Quant),
   case Columns of
     [] ->
@@ -262,26 +270,29 @@ to_sql(P0, {sql_stmt, #select{quantifier = Quant,
     _ ->
       Items = intersperse([derived_col_to_sql(Column) || Column <- Columns], ", ")
   end,
-  {P1, {Table_Ref_Clause, Table_Ref_Parameters}} = 
-    lists:foldl(fun(Table_Ref, {PI, {Accum_SQL, Accum_Params}}) ->
-                    {PJ, {Table_Ref_SQL, Table_Ref_Params}} = to_sql(PI, {table_ref, Table_Ref}),
-                    {PJ, {Accum_SQL ++ [Table_Ref_SQL], Accum_Params ++ Table_Ref_Params}}
-                end,
-                {P0, {[], []}},
-                From),
+  {P1, {Table_Ref_Clauses, Table_Ref_Parameters}} = 
+    to_sql_fold(P0, table_ref, From),
   {P2, {Where_Clause, Where_Parameters}} = to_sql(P1, {where_clause, Where}),
-  {P2, {["SELECT ", Quant_SQL, " ", Items, [" FROM ", intersperse(Table_Ref_Clause, ", ")], Where_Clause, ";"], 
-        Table_Ref_Parameters ++ Where_Parameters}};
+  {P3, {Sort_Spec_Clauses, Sort_Specs_Parameters}} =
+    to_sql_fold(P2, sort_spec, Sort_Specs),
+  Order_By_Clause =
+    case Sort_Spec_Clauses of
+      [] -> "";
+      _ -> [" ORDER BY ", intersperse(Sort_Spec_Clauses, ", ")]
+    end,
+  {P4, {Offset_Clause, Offset_Params}} = to_sql(P3, {offset, Offset}),
+  {P4, {["SELECT ", Quant_SQL, " ", Items,
+         [" FROM ", intersperse(Table_Ref_Clauses, ", ")],
+         Where_Clause,
+         Order_By_Clause,
+         Offset_Clause,
+         ";"], 
+        Table_Ref_Parameters ++ Where_Parameters ++ Sort_Specs_Parameters ++ Offset_Params}};
 to_sql(P0, {sql_stmt, #insert{table = Table, 
                               columns = Columns, 
                               values = Rows}}) ->
-  {P1, {Values_Clause, Values_Parameters}} = 
-    lists:foldl(fun(Row, {PI, {Accum_SQL, Accum_Params}}) ->
-                    {PJ, {Pred_SQL, Pred_Params}} = to_sql(PI, {value_expr_list, Row}),
-                    {PJ, {Accum_SQL ++ [Pred_SQL], Accum_Params ++ Pred_Params}}
-                end,
-                {P0, {[], []}},
-                Rows),
+  {P1, {Values_Clause, Values_Parameters}} =
+    to_sql_fold(P0, value_expr_list, Rows),
   {P1, {["INSERT INTO ",
          name_to_sql(Table),
          " (", intersperse([name_to_sql(Column) || Column <- Columns], ", "), ")",
@@ -292,6 +303,7 @@ to_sql(P0, {sql_stmt, #update{table = Table,
                               set = Set,
                               where = Where}}) ->
   {P1, {Set_Clause, Set_Parameters}} = 
+    %% TODO: cannot be easily factored into to_sql_fold
     lists:foldl(fun({Column, Value}, {PI, {Accum_SQL, Accum_Params}}) ->
                     {PJ, {Expr_SQL, Expr_Params}} = to_sql(PI, {value_expr, Value}),
                     {PJ, {Accum_SQL ++ [[name_to_sql(Column), " = ", Expr_SQL]], Accum_Params ++ Expr_Params}}
@@ -313,12 +325,7 @@ to_sql(P0, {sql_stmt, #delete{table = Table,
 %% Serialize a values clause
 to_sql(P0, {value_expr_list, Row}) ->
   {P1, {Values_Clause, Values_Parameters}} = 
-    lists:foldl(fun(Value, {PI, {Accum_SQL, Accum_Params}}) ->
-                    {PJ, {Expr_SQL, Expr_Params}} = to_sql(PI, {value_expr, Value}),
-                    {PJ, {Accum_SQL ++ [Expr_SQL], Accum_Params ++ Expr_Params}}
-                end,
-                {P0, {[], []}},
-                Row),
+    to_sql_fold(P0, value_expr, Row),
   {P1, {["(", intersperse(Values_Clause, ", "), ")"], Values_Parameters}};
 %% Serialize <table reference>
 to_sql(P0, {table_ref, #join{type = Type,
@@ -353,6 +360,43 @@ to_sql(P0, {where_clause, undefined}) ->
 to_sql(P0, {where_clause, Predicate}) ->
   {P1, {Pred_SQL, Pred_Params}} = to_sql(P0, {predicate, Predicate}),
   {P1, {[" WHERE ", Pred_SQL], Pred_Params}};
+%% Serialize <sort_spec>
+to_sql(P0, {sort_spec, {Value, Order, Nulls}}) ->
+  {P1, {Value_SQL, Value_Params}} = to_sql(P0, {value_expr, Value}),
+  {P1, {[Value_SQL, " ",
+         case Order of asc -> "ASC"; desc -> "DESC" end,
+         " NULLS ",
+         case Nulls of last -> "LAST"; first -> "FIRST" end],
+       Value_Params}};
+to_sql(P0, {sort_spec, {Value, asc}}) ->
+  {P1, {Value_SQL, Value_Params}} = to_sql(P0, {value_expr, Value}),
+  {P1, {[Value_SQL, " ASC"], Value_Params}};
+to_sql(P0, {sort_spec, {Value, desc}}) ->
+  {P1, {Value_SQL, Value_Params}} = to_sql(P0, {value_expr, Value}),
+  {P1, {[Value_SQL, " DESC"], Value_Params}};
+to_sql(P0, {sort_spec, {Value, first}}) ->
+  {P1, {Value_SQL, Value_Params}} = to_sql(P0, {value_expr, Value}),
+  {P1, {[Value_SQL, " NULLS FIRST"], Value_Params}};
+to_sql(P0, {sort_spec, {Value, last}}) ->
+  {P1, {Value_SQL, Value_Params}} = to_sql(P0, {value_expr, Value}),
+  {P1, {[Value_SQL, " NULLS LAST"], Value_Params}};
+to_sql(P0, {sort_spec, Value}) ->
+  to_sql(P0, {value_expr, Value});
+%% Serialize offset/fetch
+to_sql(P0, {offset, undefined}) ->
+  {P0, {"", []}};
+to_sql(P0, {offset, {Start, Count}}) ->
+  {P1, {Start_SQL, Start_Params}} = to_sql(P0, {value_expr, Start}),
+  {P2, {Count_SQL, Count_Params}} = to_sql(P1, {value_expr, Count}),
+  {P2, {[" OFFSET (", Start_SQL, ") FETCH NEXT (", Count_SQL, ") ROWS ONLY"],
+        Start_Params ++ Count_Params}};
+to_sql(P0, {offset, {Value, Order, Nulls}}) ->
+  {P1, {Value_SQL, Value_Params}} = to_sql(P0, {value_expr, Value}),
+  {P1, {[Value_SQL, " ",
+         case Order of asc -> "ASC"; desc -> "DESC" end,
+         " NULLS ",
+         case Nulls of last -> "LAST"; first -> "FIRST" end],
+       Value_Params}};
 %% Serialize <predicate>
 to_sql(P0, {predicate, {'not', Predicate}}) ->
   {P1, {Pred_SQL, Pred_Params}} = to_sql(P0, {predicate, Predicate}),
@@ -364,6 +408,7 @@ to_sql(P0, {predicate, {Logic_Bin_Op, [Pred1 | Predicates]}}) when Logic_Bin_Op 
                'or' -> " OR "
              end,
   {P1, {Pred1_SQL, Pred1_Params}} = to_sql(P0, {predicate, Pred1}),
+  %% TODO: cannot be easily factored into to_sql_fold
   lists:foldl(fun(Pred, {PI, {Accum_SQL, Accum_Params}}) ->
                   {PJ, {Pred_SQL, Pred_Params}} = to_sql(PI, {predicate, Pred}),
                   {PJ, {[Accum_SQL, Operator, Pred_SQL], Accum_Params ++ Pred_Params}}
@@ -412,21 +457,11 @@ to_sql(P0, {value_expr, Column}) when is_atom(Column),
 to_sql(P0, {value_expr, {Function_Name, Actual_Args}})
   when is_binary(Function_Name) ->
   {P1, {Args_SQLs, Args_Params}} = 
-    lists:foldl(fun(Value, {PI, {Accum_SQLs, Accum_Params}}) ->
-                    {PJ, {Expr_SQL, Expr_Params}} = to_sql(PI, {value_expr, Value}),
-                    {PJ, {Accum_SQLs ++ [Expr_SQL], Accum_Params ++ Expr_Params}}
-                end,
-                {P0, {[], []}},
-                Actual_Args),
+    to_sql_fold(P0, value_expr, Actual_Args),
   {P1, {[Function_Name, "(", intersperse(Args_SQLs, ", "), ")"], Args_Params}};
 to_sql(P0, {value_expr, Value_Exprs}) when is_list(Value_Exprs) ->
   {P1, {Values_SQLs, Values_Params}} = 
-    lists:foldl(fun(Value, {PI, {Accum_SQLs, Accum_Params}}) ->
-                    {PJ, {Expr_SQL, Expr_Params}} = to_sql(PI, {value_expr, Value}),
-                    {PJ, {Accum_SQLs ++ [Expr_SQL], Accum_Params ++ Expr_Params}}
-                end,
-                {P0, {[], []}},
-                Value_Exprs),
+    to_sql_fold(P0, value_expr, Value_Exprs),
   {P1, {["{", intersperse(Values_SQLs, ", "), "}"], Values_Params}};
 to_sql(P0, {value_expr, Literal}) ->
   to_sql(P0, {literal, Literal});
@@ -441,6 +476,16 @@ to_sql(P0, {literal, Value}) when is_binary(Value);
                                   is_integer(Value);
                                   is_float(Value) ->
   {P0+1, {get_placeholder(P0), [Value]}}.
+
+%% Serialize a list of AST nodes
+to_sql_fold(P0, Node_Type, Nodes) ->
+  lists:foldl(fun(Node, {PI, {Accum_SQL, Accum_Params}}) ->
+                  {PJ, {Node_SQL, Node_Params}} =
+                    to_sql(PI, {Node_Type, Node}),
+                  {PJ, {Accum_SQL ++ [Node_SQL], Accum_Params ++ Node_Params}}
+              end,
+              {P0, {[], []}},
+              Nodes).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Serialize set quantifier

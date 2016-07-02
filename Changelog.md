@@ -4,6 +4,12 @@
 
 ## Next release
 
+## v0.3.1
+
+- Refactor some folds applying to_sql to lists of clauses.
+- OFFSET/FETCH clause added to SELECT (introduced in SQL in 2008).
+- ORDER BY clause added to SELECT (<sort specification>).
+
 ## v0.3.0
 
 - This library now uses placeholders.
