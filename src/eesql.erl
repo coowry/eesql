@@ -241,7 +241,9 @@ to_sql(Statement) ->
              | {value_expr, value_expr()}
              | {value_expr_list, [value_expr()]}
              | {table_ref, table_ref()}
-             | {literal, literal()})
+             | {literal, literal()}
+             | {offset, undefined | {pos_integer(), pos_integer()}}
+             | {conflict, undefined | {[column_name()], update_stmt()}})
             -> {Pos, {Equery, Params}}
             when Pos :: pos_integer(),
                  Equery :: iodata(),
@@ -290,15 +292,18 @@ to_sql(P0, {sql_stmt, #select{quantifier = Quant,
         Table_Ref_Parameters ++ Where_Parameters ++ Sort_Specs_Parameters ++ Offset_Params}};
 to_sql(P0, {sql_stmt, #insert{table = Table, 
                               columns = Columns, 
-                              values = Rows}}) ->
+                              values = Rows,
+                              conflict = Conflict}}) ->
   {P1, {Values_Clause, Values_Parameters}} =
     to_sql_fold(P0, value_expr_list, Rows),
-  {P1, {["INSERT INTO ",
+  {P2, {Conflict_Clause, Conflict_Params}} = to_sql(P1, {conflict, Conflict}),
+  {P2, {["INSERT INTO ",
          name_to_sql(Table),
          " (", intersperse([name_to_sql(Column) || Column <- Columns], ", "), ")",
          " VALUES ",
          intersperse(Values_Clause, ", "),
-         " RETURNING *;"], Values_Parameters}};
+         Conflict_Clause,
+         " RETURNING *;"], Values_Parameters ++ Conflict_Params}};
 to_sql(P0, {sql_stmt, #update{table = Table,
                               set = Set,
                               where = Where}}) ->
@@ -397,6 +402,31 @@ to_sql(P0, {offset, {Value, Order, Nulls}}) ->
          " NULLS ",
          case Nulls of last -> "LAST"; first -> "FIRST" end],
        Value_Params}};
+%% Serialize on conflict
+to_sql(P0, {conflict, undefined}) ->
+  {P0, {"", []}};
+to_sql(P0, {conflict, {Conflict_Target, #update{set = Set,
+                                                where = Where}}}) ->
+  Conflict_Target_Clause = 
+    case Conflict_Target of
+      [] -> "";
+      _ -> ["(", intersperse([name_to_sql(Column) || Column <- Conflict_Target], ", "), ")"]
+    end,
+  {P1, {Set_Clause, Set_Parameters}} = 
+    %% TODO: cannot be easily factored into to_sql_fold
+    lists:foldl(fun({Column, Value}, {PI, {Accum_SQL, Accum_Params}}) ->
+                    {PJ, {Expr_SQL, Expr_Params}} = to_sql(PI, {value_expr, Value}),
+                    {PJ, {Accum_SQL ++ [[name_to_sql(Column), " = ", Expr_SQL]], Accum_Params ++ Expr_Params}}
+                end,
+                {P0, {[], []}},
+                Set),
+  {P2, {Where_Clause, Where_Parameters}} = to_sql(P1, {where_clause, Where}),
+  {P2, {[" ON CONFLICT ", 
+         Conflict_Target_Clause,
+         " DO UPDATE SET ", 
+         intersperse(Set_Clause, ", "),
+         Where_Clause],
+        Set_Parameters ++ Where_Parameters}};
 %% Serialize <predicate>
 to_sql(P0, {predicate, {'not', Predicate}}) ->
   {P1, {Pred_SQL, Pred_Params}} = to_sql(P0, {predicate, Predicate}),
