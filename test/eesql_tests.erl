@@ -157,6 +157,16 @@ insert2_test() ->
   ?assertEqual("INSERT INTO preuser (created, expired, fired, id, user_id) VALUES ($1, NULL, NULL, $2, $3) RETURNING *;",
                lists:flatten(io_lib:format("~s",[Insert_AST]))).
 
+insert_conflict_test() ->
+  {Insert_AST, Params} = eesql:to_sql(#insert{table = preuser,
+                                              columns = [created, expired, fired, id, user_id],
+                                              values = [[11234, null, null, 1, <<"email@example.com">>]],
+                                              conflict = {[id], #update{table = preuser,
+                                                                        set = [{user_id, <<"updated@example.com">>}]}}}),
+  ?assertEqual([11234, 1, <<"email@example.com">>, <<"updated@example.com">>], Params),
+  ?assertEqual("INSERT INTO preuser (created, expired, fired, id, user_id) VALUES ($1, NULL, NULL, $2, $3) ON CONFLICT (id) DO UPDATE SET user_id = $4 RETURNING *;",
+               lists:flatten(io_lib:format("~s",[Insert_AST]))).
+
 update_test() ->
   {Update_AST, Params} = eesql:to_sql(#update{table = preuser,
                                               set = [{a,21}]}),
