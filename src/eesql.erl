@@ -243,7 +243,7 @@ to_sql(Statement) ->
              | {table_ref, table_ref()}
              | {literal, literal()}
              | {offset, undefined | {pos_integer(), pos_integer()}}
-             | {conflict, undefined | {[column_name()], update_stmt()}})
+             | {on_conflict_update_target, undefined | column_name(), [column_name()]})
             -> {Pos, {Equery, Params}}
             when Pos :: pos_integer(),
                  Equery :: iodata(),
