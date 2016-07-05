@@ -161,10 +161,9 @@ insert_conflict_test() ->
   {Insert_AST, Params} = eesql:to_sql(#insert{table = preuser,
                                               columns = [created, expired, fired, id, user_id],
                                               values = [[11234, null, null, 1, <<"email@example.com">>]],
-                                              conflict = {[id], #update{table = preuser,
-                                                                        set = [{user_id, <<"updated@example.com">>}]}}}),
-  ?assertEqual([11234, 1, <<"email@example.com">>, <<"updated@example.com">>], Params),
-  ?assertEqual("INSERT INTO preuser (created, expired, fired, id, user_id) VALUES ($1, NULL, NULL, $2, $3) ON CONFLICT (id) DO UPDATE SET user_id = $4 RETURNING *;",
+                                              on_conflict_update_target = id}),
+  ?assertEqual([11234, 1, <<"email@example.com">>], Params),
+  ?assertEqual("INSERT INTO preuser (created, expired, fired, id, user_id) VALUES ($1, NULL, NULL, $2, $3) ON CONFLICT (id) DO UPDATE SET created = EXCLUDED.created, expired = EXCLUDED.expired, fired = EXCLUDED.fired, user_id = EXCLUDED.user_id RETURNING *;",
                lists:flatten(io_lib:format("~s",[Insert_AST]))).
 
 update_test() ->
