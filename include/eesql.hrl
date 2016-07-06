@@ -37,7 +37,7 @@
      table :: eesql:table_name(),
      columns :: nonempty_list(eesql:column_name()), %% List of columns to set
      values :: nonempty_list(eesql:row_value_expr()), %% (VALUES) values to insert
-     conflict :: undefined | {[eesql:column_name()], eesql:update_stmt()} %% [ conflict_target ] conflict_action
+     on_conflict_update_target :: undefined | [eesql:column_name()] %% UPDATE when the columns conflicts
    }
   ).
 
