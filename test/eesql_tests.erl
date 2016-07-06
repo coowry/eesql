@@ -157,13 +157,22 @@ insert2_test() ->
   ?assertEqual("INSERT INTO preuser (created, expired, fired, id, user_id) VALUES ($1, NULL, NULL, $2, $3) RETURNING *;",
                lists:flatten(io_lib:format("~s",[Insert_AST]))).
 
-insert_conflict_test() ->
+insert_conflict1_test() ->
   {Insert_AST, Params} = eesql:to_sql(#insert{table = preuser,
                                               columns = [created, expired, fired, id, user_id],
                                               values = [[11234, null, null, 1, <<"email@example.com">>]],
                                               on_conflict_update_target = [id]}),
   ?assertEqual([11234, 1, <<"email@example.com">>], Params),
   ?assertEqual("INSERT INTO preuser (created, expired, fired, id, user_id) VALUES ($1, NULL, NULL, $2, $3) ON CONFLICT (id) DO UPDATE SET created = EXCLUDED.created, expired = EXCLUDED.expired, fired = EXCLUDED.fired, user_id = EXCLUDED.user_id RETURNING *;",
+               lists:flatten(io_lib:format("~s",[Insert_AST]))).
+
+insert_conflict2_test() ->
+  {Insert_AST, Params} = eesql:to_sql(#insert{table = hlr_lookups_networks,
+                                              columns = [mcc, mnc, originalnetworkname],
+                                              values = [[<<"214">>, <<"01">>, <<"Vodafone">>]],
+                                              on_conflict_update_target = [mcc, mnc]}),
+  ?assertEqual([<<"214">>, <<"01">>, <<"Vodafone">>], Params),
+  ?assertEqual("INSERT INTO hlr_lookups_networks (mcc, mnc, originalnetworkname) VALUES ($1, $2, $3) ON CONFLICT (mcc, mnc) DO UPDATE SET originalnetworkname = EXCLUDED.originalnetworkname RETURNING *;",
                lists:flatten(io_lib:format("~s",[Insert_AST]))).
 
 update_test() ->
