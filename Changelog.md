@@ -4,10 +4,13 @@
 
 ## Next release
 
+## v0.3.2
+
 - Adding a light version of ON-CONFLICT-UPDATE new postgres feature to
   INSERT. This light version just specified the conflict target and
   the rest of the values are automaticaly udpated on conflict by using
   table EXCLUDED.
+- New tests
 
 ## v0.3.1
 
