@@ -405,6 +405,10 @@ to_sql(P0, {offset, {Value, Order, Nulls}}) ->
 %% Serialize on conflict
 to_sql(P0, {on_conflict_update_target, undefined, _}) ->
   {P0, {"", []}};
+to_sql(P0, {on_conflict_update_target, [], _Columns}) ->
+  %% Conflict columns is []
+  {P0, {[" ON CONFLICT DO NOTHING"],
+        []}};
 to_sql(P0, {on_conflict_update_target, Conflict_Columns, Columns}) ->
   Columns_To_Update = lists:subtract(Columns, Conflict_Columns),
   Set_Clauses = [ begin
