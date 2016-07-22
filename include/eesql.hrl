@@ -57,3 +57,9 @@
      where :: eesql:predicate() %% (WHERE) search_condition
    }
   ).
+
+-record(
+  truncate,
+  {
+    table :: eesql:table_name() %% CLEARS TABLE
+  }).
