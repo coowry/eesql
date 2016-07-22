@@ -208,3 +208,9 @@ rollback_test() ->
   ?assertEqual([], Params),
   ?assertEqual("ROLLBACK;",
                lists:flatten(io_lib:format("~s",[Rollback_AST]))).
+
+truncate_test() ->
+  {Truncate_AST, Params} = eesql:to_sql(#truncate{table = sims}),
+  ?assertEqual([], Params),
+  ?assertEqual("TRUNCATE sims;",
+               lists:flatten(io_lib:format("~s",[Truncate_AST]))).

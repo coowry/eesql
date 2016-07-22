@@ -62,7 +62,8 @@
       | query_spec()
       | insert_stmt()
       | update_stmt()
-      | delete_stmt().
+      | delete_stmt()
+      | truncate_stmt().
 
 %% Any name (column name, table name, alias, ...)
 -type name() :: atom().
@@ -215,6 +216,9 @@
 %% DELETE <delete statement: searched>
 -type delete_stmt() :: #delete{}.
 
+%% TRUNCATE
+-type truncate_stmt() :: #truncate{}.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc X = [1,2,3], [1, x, 2, x, 3] = intersperse(X, x)
 -spec intersperse(list(),list()) -> list().
@@ -259,6 +263,8 @@ to_sql(Position, {sql_stmt, commit_and_no_chain}) ->
   {Position, {"COMMIT AND NO CHAIN;", []}};
 to_sql(Position, {sql_stmt, rollback}) ->
   {Position, {"ROLLBACK;", []}};
+to_sql(Position, {sql_stmt, #truncate{table = Table}}) ->
+  {Position, {["TRUNCATE ", name_to_sql(Table), ";"], []}};
 to_sql(P0, {sql_stmt, #select{quantifier = Quant,
                               columns = Columns,
                               from = From,
