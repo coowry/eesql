@@ -4,6 +4,11 @@
 
 ## Next release
 
+## v0.3.4
+
+- Feature TRUNCATE table
+- New test truncate
+
 ## v0.3.3
 
 - Adding ON CONFLICT DO NOTHING if the given conflict columns are
