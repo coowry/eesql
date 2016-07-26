@@ -62,7 +62,8 @@
       | query_spec()
       | insert_stmt()
       | update_stmt()
-      | delete_stmt().
+      | delete_stmt()
+      | truncate_stmt().
 
 %% Any name (column name, table name, alias, ...)
 -type name() :: atom().
@@ -216,6 +217,9 @@
 %% DELETE <delete statement: searched>
 -type delete_stmt() :: #delete{}.
 
+%% TRUNCATE
+-type truncate_stmt() :: #truncate{}.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc X = [1,2,3], [1, x, 2, x, 3] = intersperse(X, x)
 -spec intersperse(list(),list()) -> list().
@@ -260,6 +264,8 @@ to_sql(Position, {sql_stmt, commit_and_no_chain}) ->
   {Position, {"COMMIT AND NO CHAIN;", []}};
 to_sql(Position, {sql_stmt, rollback}) ->
   {Position, {"ROLLBACK;", []}};
+to_sql(Position, {sql_stmt, #truncate{table = Table}}) ->
+  {Position, {["TRUNCATE ", name_to_sql(Table), ";"], []}};
 to_sql(P0, {sql_stmt, #select{quantifier = Quant,
                               columns = Columns,
                               from = From,
@@ -406,6 +412,10 @@ to_sql(P0, {offset, {Value, Order, Nulls}}) ->
 %% Serialize on conflict
 to_sql(P0, {on_conflict_update_target, undefined, _}) ->
   {P0, {"", []}};
+to_sql(P0, {on_conflict_update_target, [], _Columns}) ->
+  %% Conflict columns is []
+  {P0, {[" ON CONFLICT DO NOTHING"],
+        []}};
 to_sql(P0, {on_conflict_update_target, Conflict_Columns, Columns}) ->
   Columns_To_Update = lists:subtract(Columns, Conflict_Columns),
   Set_Clauses = [ begin

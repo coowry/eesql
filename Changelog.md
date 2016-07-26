@@ -6,6 +6,18 @@
 
 - `true` and `false` atoms allowed as predicates.
 
+## v0.3.4
+
+- Feature TRUNCATE table
+- New test truncate
+
+## v0.3.3
+
+- Adding ON CONFLICT DO NOTHING if the given conflict columns are
+  an empty list. This allows to have an insert that does not fail
+  if there is a conflict.
+- New test.
+
 ## v0.3.2
 
 - Adding a light version of ON-CONFLICT-UPDATE new postgres feature to

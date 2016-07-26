@@ -1,5 +1,9 @@
-default:
+default: compile
+
+help:
 	@echo Usage: make [compile] [test] [dialyze] [clean] [pull] [push]
+
+all: compile dialyze test
 
 compile:
 	./rebar3 compile
@@ -21,4 +25,4 @@ pull:
 push: pull
 	git push --follow-tags origin master develop
 
-.PHONY: compile test dialyze clean pull push
+.PHONY: default help compile all test dialyze clean pull push
