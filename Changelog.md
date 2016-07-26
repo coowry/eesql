@@ -4,6 +4,8 @@
 
 ## Next release
 
+- `true` and `false` atoms allowed as predicates.
+
 ## v0.3.2
 
 - Adding a light version of ON-CONFLICT-UPDATE new postgres feature to
