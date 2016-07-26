@@ -36,16 +36,37 @@ select_theta_test() ->
   ?assertEqual("SELECT ALL users.name, emails.address FROM users, emails WHERE users.id = emails.id;",
                lists:flatten(io_lib:format("~s",[Select_AST]))).
 
+select_true_test() ->
+  {Select_AST, Params} = eesql:to_sql(#select{
+                                         columns=['users.name','emails.address'],
+                                         from = [users,emails],
+                                         where = true
+                                        }),
+  ?assertEqual([], Params),
+  ?assertEqual("SELECT ALL users.name, emails.address FROM users, emails WHERE TRUE;",
+               lists:flatten(io_lib:format("~s",[Select_AST]))).
+
+select_false_test() ->
+  {Select_AST, Params} = eesql:to_sql(#select{
+                                         columns=['users.name','emails.address'],
+                                         from = [users,emails],
+                                         where = false
+                                        }),
+  ?assertEqual([], Params),
+  ?assertEqual("SELECT ALL users.name, emails.address FROM users, emails WHERE FALSE;",
+               lists:flatten(io_lib:format("~s",[Select_AST]))).
+
 select_and_test() ->
   {Select_AST, Params} = eesql:to_sql(#select{
                                          columns=['users.name','emails.address'],
                                          from = [users,emails],
-                                         where = {'and', [{'users.id', '=', 'emails.id'},
+                                         where = {'and', [true,
+                                                          {'users.id', '=', 'emails.id'},
                                                           {'emails.valid', '=', true},
                                                           {'emails.id', like, <<"a.*">>}]}
                                         }),
   ?assertEqual([<<"a.*">>], Params),
-  ?assertEqual("SELECT ALL users.name, emails.address FROM users, emails WHERE users.id = emails.id AND emails.valid = TRUE AND emails.id LIKE $1;",
+  ?assertEqual("SELECT ALL users.name, emails.address FROM users, emails WHERE TRUE AND users.id = emails.id AND emails.valid = TRUE AND emails.id LIKE $1;",
                lists:flatten(io_lib:format("~s",[Select_AST]))).
 
 select_order_by_test() ->
