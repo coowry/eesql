@@ -4,6 +4,10 @@
 
 ## Next release
 
+## v0.3.5
+
+- `true` and `false` atoms allowed as predicates.
+
 ## v0.3.4
 
 - Feature TRUNCATE table

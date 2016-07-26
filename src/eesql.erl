@@ -126,7 +126,8 @@
 
 %% Predicates
 -type predicate() ::
-        {'not', predicate()}
+        boolean()
+      | {'not', predicate()}
       | {'and', [predicate()]}
       | {'or', [predicate()]}
       | {value_expr(), binop(), value_expr()}
@@ -428,6 +429,10 @@ to_sql(P0, {on_conflict_update_target, Conflict_Columns, Columns}) ->
          intersperse(Set_Clauses, ", ")],
         []}};
 %% Serialize <predicate>
+to_sql(P0, {predicate, true}) ->
+  {P0, {"TRUE", []}};
+to_sql(P0, {predicate, false}) ->
+  {P0, {"FALSE", []}};
 to_sql(P0, {predicate, {'not', Predicate}}) ->
   {P1, {Pred_SQL, Pred_Params}} = to_sql(P0, {predicate, Predicate}),
   {P1, {["NOT ", Pred_SQL], Pred_Params}};
