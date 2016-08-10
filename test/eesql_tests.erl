@@ -235,3 +235,9 @@ truncate_test() ->
   ?assertEqual([], Params),
   ?assertEqual("TRUNCATE sims;",
                lists:flatten(io_lib:format("~s",[Truncate_AST]))).
+
+truncate2_test() ->
+  {Truncate_AST, Params} = eesql:to_sql(#truncate{table = sims, cascade = true}),
+  ?assertEqual([], Params),
+  ?assertEqual("TRUNCATE sims CASCADE;",
+               lists:flatten(io_lib:format("~s",[Truncate_AST]))).

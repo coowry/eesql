@@ -61,5 +61,6 @@
 -record(
   truncate,
   {
-    table :: eesql:table_name() %% CLEARS TABLE
+    table :: eesql:table_name(), %% CLEARS TABLE
+    cascade = false :: boolean() %% CASCADE CLEANS ALSO FOREIGN KEYS
   }).
