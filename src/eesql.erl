@@ -264,8 +264,13 @@ to_sql(Position, {sql_stmt, commit_and_no_chain}) ->
   {Position, {"COMMIT AND NO CHAIN;", []}};
 to_sql(Position, {sql_stmt, rollback}) ->
   {Position, {"ROLLBACK;", []}};
-to_sql(Position, {sql_stmt, #truncate{table = Table}}) ->
-  {Position, {["TRUNCATE ", name_to_sql(Table), ";"], []}};
+to_sql(Position, {sql_stmt, #truncate{table = Table, cascade = Cascade}}) ->
+  case Cascade of
+    false ->
+      {Position, {["TRUNCATE ", name_to_sql(Table), ";"], []}};
+    true ->
+      {Position, {["TRUNCATE ", name_to_sql(Table), " CASCADE;"], []}}
+  end;
 to_sql(P0, {sql_stmt, #select{quantifier = Quant,
                               columns = Columns,
                               from = From,
