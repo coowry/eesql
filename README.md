@@ -2,6 +2,8 @@
 
 ## Next release
 
+- Dialyzer configuration improved: unknown detected now.
+
 ## v0.3.6
 
 - Cascade option in truncate

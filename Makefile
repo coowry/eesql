@@ -9,7 +9,7 @@ compile:
 	./rebar3 compile
 
 dialyze:
-	./rebar3 dialyzer -s
+	./rebar3 dialyzer
 
 test:
 	./rebar3 eunit
