@@ -66,7 +66,7 @@ select_and_test() ->
                                                           {'emails.id', like, <<"a.*">>}]}
                                         }),
   ?assertEqual([<<"a.*">>], Params),
-  ?assertEqual("SELECT ALL users.name, emails.address FROM users, emails WHERE TRUE AND users.id = emails.id AND emails.valid = TRUE AND emails.id LIKE $1;",
+  ?assertEqual("SELECT ALL users.name, emails.address FROM users, emails WHERE (((TRUE AND users.id = emails.id) AND emails.valid = TRUE) AND emails.id LIKE $1);",
                lists:flatten(io_lib:format("~s",[Select_AST]))).
 
 select_order_by_test() ->
