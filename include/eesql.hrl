@@ -17,6 +17,7 @@
      from :: eesql:from_clause(), %% (FROM) Source of data, table names for the moment (<from clause>)
      where :: eesql:predicate(), %% (WHERE) search condition (<where clause>)
      order_by = [] :: list(eesql:sort_spec()), %% (ORDER BY) Sort specification (<sort specification list>)
+     group_by = [] :: list(eesql:column_name()), %% TODO: Group by expression
      offset :: undefined | {pos_integer(), pos_integer()} %% (OFFSET/FETCH)
    }
   ).
