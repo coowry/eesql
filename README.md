@@ -4,6 +4,11 @@
 
 - Dialyzer configuration improved: unknown detected now.
 
+## v0.3.7
+
+- Option group by in select
+- Option count in select
+
 ## v0.3.6
 
 - Cascade option in truncate
