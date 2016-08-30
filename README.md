@@ -4,6 +4,10 @@
 
 - Dialyzer configuration improved: unknown detected now.
 
+## v0.3.8
+
+- Fix precedence of operators
+
 ## v0.3.7
 
 - Option group by in select
