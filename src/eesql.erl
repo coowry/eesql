@@ -462,7 +462,7 @@ to_sql(P0, {predicate, {Logic_Bin_Op, [Pred1 | Predicates]}}) when Logic_Bin_Op 
   %% TODO: cannot be easily factored into to_sql_fold
   lists:foldl(fun(Pred, {PI, {Accum_SQL, Accum_Params}}) ->
                   {PJ, {Pred_SQL, Pred_Params}} = to_sql(PI, {predicate, Pred}),
-                  {PJ, {[Accum_SQL, Operator, Pred_SQL], Accum_Params ++ Pred_Params}}
+                  {PJ, {["(", Accum_SQL, Operator, Pred_SQL, ")"], Accum_Params ++ Pred_Params}}
               end,
               {P1, {Pred1_SQL, Pred1_Params}},
               Predicates);
