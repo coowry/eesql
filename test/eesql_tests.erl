@@ -241,3 +241,21 @@ truncate2_test() ->
   ?assertEqual([], Params),
   ?assertEqual("TRUNCATE sims CASCADE;",
                lists:flatten(io_lib:format("~s",[Truncate_AST]))).
+
+group_by_test() ->
+  {Group_AST, Params} = eesql:to_sql(#select{from = [trades], group_by = [sort]}),
+  ?assertEqual([], Params),
+  ?assertEqual("SELECT ALL * FROM trades GROUP BY sort;",
+               lists:flatten(io_lib:format("~s",[Group_AST]))).
+
+count_all_test() ->
+  {Count_AST, Params} = eesql:to_sql(#select{from = [trades], columns = [{count, all}]}),
+  ?assertEqual([], Params),
+  ?assertEqual("SELECT ALL COUNT(*) FROM trades;",
+               lists:flatten(io_lib:format("~s",[Count_AST]))).
+
+count_test() ->
+  {Count_AST, Params} = eesql:to_sql(#select{from = [trades], columns = [{count, 'trades.id'}], where = {sort, '=', <<"p2p">>}}),
+  ?assertEqual([<<"p2p">>], Params),
+  ?assertEqual("SELECT ALL COUNT(trades.id) FROM trades WHERE sort = $1;",
+               lists:flatten(io_lib:format("~s",[Count_AST]))).
