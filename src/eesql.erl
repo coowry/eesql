@@ -104,7 +104,9 @@
 %% <derived column>
 -type derived_column() ::
         value_expr()
-      | {value_expr(), column_name()}. %% AS
+      | {value_expr(), column_name()} %% AS
+        %% TODO: Improve type
+      | {count, column_name() | all}.
 
 %% Expressions for describing "tables" (eg. FROM in a SELECT statement)
 -type table_ref() :: table_primary()
@@ -276,6 +278,7 @@ to_sql(P0, {sql_stmt, #select{quantifier = Quant,
                               from = From,
                               where = Where,
                               order_by = Sort_Specs,
+                              group_by = Group_By,
                               offset = Offset}}) ->
   Quant_SQL = set_quant_to_sql(Quant),
   case Columns of
@@ -294,11 +297,19 @@ to_sql(P0, {sql_stmt, #select{quantifier = Quant,
       [] -> "";
       _ -> [" ORDER BY ", intersperse(Sort_Spec_Clauses, ", ")]
     end,
+  %% TODO: Group By expression, not only a list of columns.
+  case Group_By of
+    [] ->
+      Group_By_Clause = "";
+    _ ->
+      Group_By_Clause = [" GROUP BY ", intersperse([derived_col_to_sql(Column) || Column <- Group_By], ", ")]
+  end,
   {P4, {Offset_Clause, Offset_Params}} = to_sql(P3, {offset, Offset}),
   {P4, {["SELECT ", Quant_SQL, " ", Items,
          [" FROM ", intersperse(Table_Ref_Clauses, ", ")],
          Where_Clause,
          Order_By_Clause,
+         Group_By_Clause,
          Offset_Clause,
          ";"], 
         Table_Ref_Parameters ++ Where_Parameters ++ Sort_Specs_Parameters ++ Offset_Params}};
@@ -538,6 +549,10 @@ set_quant_to_sql(distinct) -> "DISTINCT".
 -spec derived_col_to_sql(derived_column()) -> iodata().
 derived_col_to_sql(Column) when is_atom(Column) ->
   name_to_sql(Column);
+derived_col_to_sql({count, all}) ->
+  ["COUNT(*)"];
+derived_col_to_sql({count, Column}) ->
+  ["COUNT(", name_to_sql(Column), ")"];
 derived_col_to_sql({Column, Alias}) ->
   [name_to_sql(Column), " AS ", name_to_sql(Alias)].
 
