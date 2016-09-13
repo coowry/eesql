@@ -4,6 +4,11 @@
 
 - Dialyzer configuration improved: unknown detected now.
 
+## v0.3.9
+
+- Offset type specficaition fixed. The index starts
+  in 0.
+
 ## v0.3.8
 
 - Fix precedence of operators
