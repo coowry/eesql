@@ -1,11 +1,14 @@
 default: compile
 
 help:
-	@echo Usage: make [compile] [test] [dialyze] [clean] [pull] [push]
+	@echo Usage: make [all] [compile] [test] [dialyze] [clean] [pull] [push] [upgrade]
 
 all: compile dialyze test
 
-compile:
+upgrade:
+	./rebar3 upgrade
+
+compile: upgrade
 	./rebar3 compile
 
 dialyze:
@@ -13,6 +16,9 @@ dialyze:
 
 test:
 	./rebar3 eunit
+
+shell:
+	./rebar3 shell
 
 clean:
 	./rebar3 clean
@@ -25,4 +31,4 @@ pull:
 push: pull
 	git push --follow-tags origin master develop
 
-.PHONY: default help compile all test dialyze clean pull push
+.PHONY: default all help compile test dialyze shell clean pull push
