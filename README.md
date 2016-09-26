@@ -2,11 +2,14 @@
 
 ## Next release
 
+## v0.3.10
+
 - Dialyzer configuration improved: unknown detected now.
+- Enrich: Count distinct
 
 ## v0.3.9
 
-- Offset type specficaition fixed. The index starts
+- Offset type specification fixed. The index starts
   in 0.
 
 ## v0.3.8
