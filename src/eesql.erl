@@ -106,7 +106,8 @@
         value_expr()
       | {value_expr(), column_name()} %% AS
         %% TODO: Improve type
-      | {count, column_name() | all}.
+      | {count, column_name() | all}
+      | {count, {distinct, column_name()}}.
 
 %% Expressions for describing "tables" (eg. FROM in a SELECT statement)
 -type table_ref() :: table_primary()
@@ -551,6 +552,8 @@ derived_col_to_sql(Column) when is_atom(Column) ->
   name_to_sql(Column);
 derived_col_to_sql({count, all}) ->
   ["COUNT(*)"];
+derived_col_to_sql({count, {distinct, Column}}) ->
+  ["COUNT(DISTINCT ", name_to_sql(Column), ")"];
 derived_col_to_sql({count, Column}) ->
   ["COUNT(", name_to_sql(Column), ")"];
 derived_col_to_sql({Column, Alias}) ->

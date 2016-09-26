@@ -259,3 +259,9 @@ count_test() ->
   ?assertEqual([<<"p2p">>], Params),
   ?assertEqual("SELECT ALL COUNT(trades.id) FROM trades WHERE sort = $1;",
                lists:flatten(io_lib:format("~s",[Count_AST]))).
+
+distinct_count_test() ->
+  {Count_AST, Params} = eesql:to_sql(#select{from = [trades], columns = [{count, {distinct, 'trades.sender'}}], where = {sort, '=', <<"p2p">>}}),
+  ?assertEqual([<<"p2p">>], Params),
+  ?assertEqual("SELECT ALL COUNT(DISTINCT trades.sender) FROM trades WHERE sort = $1;",
+               lists:flatten(io_lib:format("~s",[Count_AST]))).
