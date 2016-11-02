@@ -499,7 +499,9 @@ to_sql(P0, {predicate, {between, Expr, Min, Max}}) ->
 to_sql(P0, {predicate, {in, Expr, Select = #select{}}}) ->
   {P1, {Expr_SQL, Expr_Params}} = to_sql(P0, {value_expr, Expr}),
   {P2, {Select_SQL, Select_Params}} = to_sql(P1, {sql_stmt, Select}),
-  {P2, {[Expr_SQL, " IN ", Select_SQL], Expr_Params ++ Select_Params}};
+  %% Remove semicolon from select sql to avoid syntax error
+  Select_SQL_Without_Semicolon = lists:droplast(Select_SQL),
+  {P2, {[Expr_SQL, " IN (", Select_SQL_Without_Semicolon, ")"], Expr_Params ++ Select_Params}};
 %% Serialize a value expression
 to_sql(P0, {value_expr, Column}) when is_atom(Column),
                                       Column /= null,
