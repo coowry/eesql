@@ -2,6 +2,10 @@
 
 ## Next release
 
+## v0.3.11
+
+- Fixed bug in SQL IN operator
+
 ## v0.3.10
 
 - Dialyzer configuration improved: unknown detected now.
