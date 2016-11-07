@@ -2,6 +2,11 @@
 
 ## Next release
 
+## v0.3.12
+
+- Select for update: Creates a lock over the
+  read object to safely perform an update
+
 ## v0.3.11
 
 - Fixed bug in SQL IN operator
