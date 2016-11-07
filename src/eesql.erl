@@ -280,7 +280,8 @@ to_sql(P0, {sql_stmt, #select{quantifier = Quant,
                               where = Where,
                               order_by = Sort_Specs,
                               group_by = Group_By,
-                              offset = Offset}}) ->
+                              offset = Offset,
+                              for_update = For_Update}}) ->
   Quant_SQL = set_quant_to_sql(Quant),
   case Columns of
     [] ->
@@ -306,12 +307,19 @@ to_sql(P0, {sql_stmt, #select{quantifier = Quant,
       Group_By_Clause = [" GROUP BY ", intersperse([derived_col_to_sql(Column) || Column <- Group_By], ", ")]
   end,
   {P4, {Offset_Clause, Offset_Params}} = to_sql(P3, {offset, Offset}),
+  case For_Update of
+    false ->
+      For_Update_Clause = "";
+    true ->
+      For_Update_Clause = " FOR UPDATE"
+  end,
   {P4, {["SELECT ", Quant_SQL, " ", Items,
          [" FROM ", intersperse(Table_Ref_Clauses, ", ")],
          Where_Clause,
          Order_By_Clause,
          Group_By_Clause,
          Offset_Clause,
+         For_Update_Clause,
          ";"], 
         Table_Ref_Parameters ++ Where_Parameters ++ Sort_Specs_Parameters ++ Offset_Params}};
 to_sql(P0, {sql_stmt, #insert{table = Table, 
