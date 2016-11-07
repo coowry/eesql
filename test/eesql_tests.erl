@@ -273,3 +273,11 @@ select_in_test() ->
   ?assertEqual([], Params),
   ?assertEqual("SELECT ALL * FROM trades WHERE bkid IN (SELECT ALL id FROM bulks);",
                lists:flatten(io_lib:format("~s",[Select_AST]))).
+
+select_for_update_test() ->
+  {Select_AST, Params} = eesql:to_sql(#select{from = [trades], 
+                                              for_update = true, 
+                                              where = {id, '=', <<"tr-123456789">>}}),
+  ?assertEqual([<<"tr-123456789">>], Params),
+  ?assertEqual("SELECT ALL * FROM trades WHERE id = $1 FOR UPDATE;",
+               lists:flatten(io_lib:format("~s",[Select_AST]))).

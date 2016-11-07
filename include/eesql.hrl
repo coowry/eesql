@@ -18,7 +18,8 @@
      where :: eesql:predicate(), %% (WHERE) search condition (<where clause>)
      order_by = [] :: list(eesql:sort_spec()), %% (ORDER BY) Sort specification (<sort specification list>)
      group_by = [] :: list(eesql:column_name()), %% TODO: Group by expression
-     offset :: undefined | {non_neg_integer(), non_neg_integer()} %% (OFFSET/FETCH)
+     offset :: undefined | {non_neg_integer(), non_neg_integer()}, %% (OFFSET/FETCH)
+     for_update = false :: boolean() %% Decides if a select is done for update or not
    }
   ).
 
