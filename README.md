@@ -2,6 +2,10 @@
 
 ## Next release
 
+## v0.3.13
+
+- Fixed NOT operator's precedence.
+
 ## v0.3.12
 
 - Select for update: Creates a lock over the
