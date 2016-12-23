@@ -460,7 +460,7 @@ to_sql(P0, {predicate, false}) ->
   {P0, {"FALSE", []}};
 to_sql(P0, {predicate, {'not', Predicate}}) ->
   {P1, {Pred_SQL, Pred_Params}} = to_sql(P0, {predicate, Predicate}),
-  {P1, {["NOT ", Pred_SQL], Pred_Params}};
+  {P1, {["NOT (", Pred_SQL, ")"], Pred_Params}};
 to_sql(P0, {predicate, {Logic_Bin_Op, [Pred1 | Predicates]}}) when Logic_Bin_Op == 'and';
                                                                    Logic_Bin_Op == 'or' ->
   Operator = case Logic_Bin_Op of

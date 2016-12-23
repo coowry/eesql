@@ -281,3 +281,11 @@ select_for_update_test() ->
   ?assertEqual([<<"tr-123456789">>], Params),
   ?assertEqual("SELECT ALL * FROM trades WHERE id = $1 FOR UPDATE;",
                lists:flatten(io_lib:format("~s",[Select_AST]))).
+
+not_test() ->
+  {Select_AST, Params} = eesql:to_sql(#select{from = [trades],
+                                              where = {'and',[{'not',{is_null,authorized}},
+                                                              {'not',{is_null,created}}]}}),
+  ?assertEqual([], Params),
+  ?assertEqual("SELECT ALL * FROM trades WHERE (NOT (authorized IS NULL) AND NOT (created IS NULL));",
+               lists:flatten(io_lib:format("~s",[Select_AST]))).
