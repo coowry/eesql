@@ -2,6 +2,12 @@
 
 ## Next release
 
+## v0.3.14
+
+- Small fixes in type specifications.
+  The release is necessary to avoid dialyzer
+  errors in cwdal.
+
 ## v0.3.13
 
 - Fixed NOT operator's precedence.
