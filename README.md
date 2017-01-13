@@ -2,6 +2,12 @@
 
 ## Next release
 
+## v0.4.0
+
+- New join structure to allow multiple
+  consecutive joins. Joins in previous versions
+  are not compatible with the new one.
+
 ## v0.3.14
 
 - Small fixes in type specifications.
