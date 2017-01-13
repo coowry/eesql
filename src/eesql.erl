@@ -37,6 +37,9 @@
     sort_spec/0,
     table_name/0,
     table_ref/0,
+    joined_table/0,
+    table_primary/0,
+    
     update_stmt/0,
     value_expr/0
    ]
@@ -365,22 +368,28 @@ to_sql(P0, {value_expr_list, Row}) ->
     to_sql_fold(P0, value_expr, Row),
   {P1, {["(", intersperse(Values_Clause, ", "), ")"], Values_Parameters}};
 %% Serialize <table reference>
-to_sql(P0, {table_ref, #join{type = Type,
-                             left = Left,
-                             right = Right,
-                             spec = Spec}}) ->
-  {P1, {Ref_Left_SQL, _Ref_Left_Params}} = to_sql(P0, {table_ref, Left}),
-  {P2, {Ref_Right_SQL, _Ref_Right_Params}} = to_sql(P1, {table_ref, Right}),
-  {P3, {Pred_SQL, Pred_Parameters}} = to_sql(P2, {predicate, Spec}),
-  {P3, {[Ref_Left_SQL,$ ,
-         case Type of
+to_sql(P0, {table_ref, #join{type = no_join,
+                             table = Table,
+                             joins = Joins}}) ->
+  {P1, {Table_Clauses, _Params}} = to_sql(P0, {table_ref, Table}),
+  {P2, {Joins_Clauses, Joins_Params}} = 
+    to_sql_fold(P1, join, Joins),
+  {P2, {[Table_Clauses, $ ,
+         intersperse(Joins_Clauses, " ")],
+        Joins_Params}};
+to_sql(P0, {join, #join{type = Type,
+                        table = Table,
+                        spec = Spec}}) ->
+  {P1, {Table_Clauses, _Params}} = to_sql(P0, {table_ref, Table}),
+  {P2, {Pred_SQL, Pred_Parameters}} = to_sql(P1, {predicate, Spec}),
+  {P2, {[case Type of
            inner -> "INNER";
            left -> "LEFT OUTER";
            right -> "RIGHT OUTER";
            full -> "FULL OUTER"
          end, $ ,
          "JOIN ",
-         Ref_Right_SQL,$ ,
+         Table_Clauses,$ ,
          "ON",$ ,
          Pred_SQL], 
         Pred_Parameters}};

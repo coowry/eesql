@@ -26,9 +26,9 @@
 -record(
    join,
    {
-     type = inner :: eesql:join_type(),
-     left :: eesql:table_ref(),
-     right :: eesql:table_ref(),
+     type :: eesql:join_type() | no_join, %% no_join represents the beggining of the join
+     table :: eesql:table_primary(),
+     joins :: [eesql:joined_table()],
      spec :: eesql:predicate()
    }
   ).
