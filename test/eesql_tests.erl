@@ -18,12 +18,33 @@ select2_test() ->
 select_join_test() ->
   {Select_AST, Params} = eesql:to_sql(#select{
                                          columns=['users.name','emails.address'],
-                                         from = [#join{type= inner,
-                                                       left = users,
-                                                       right = emails,
-                                                       spec = {'users.id','=','emails.id'}}]}),
+                                         from = [#join{type = no_join,
+                                                       table = users,
+                                                       joins = [#join{type = inner,
+                                                                      table = emails,
+                                                                      spec = {'users.id','=','emails.id'}}]}]}),
   ?assertEqual([], Params),
   ?assertEqual("SELECT ALL users.name, emails.address FROM users INNER JOIN emails ON users.id = emails.id;",
+               lists:flatten(io_lib:format("~s",[Select_AST]))).
+
+select_join2_test() ->
+  {Select_AST, Params} = eesql:to_sql(#select{
+                                         columns = ['sim.id','users.name'],
+                                         from = [#join{type = no_join,
+                                                       table = {sims, sim},
+                                                       joins = [#join{type = left,
+                                                                      table = sim_owners,
+                                                                      spec = {'sim_owners.id','=','sim.id'}},
+                                                                #join{type = left,
+                                                                      table = users,
+                                                                      spec = {'users.id','=','sim_owners.owner_id'}}]
+                                                      }],
+                                         where = {'not', {is_null,'sim.secret'}}}),
+  ?assertEqual([], Params),
+  ?assertEqual("SELECT ALL sim.id, users.name FROM sims AS sim "
+               "LEFT OUTER JOIN sim_owners ON sim_owners.id = sim.id "
+               "LEFT OUTER JOIN users ON users.id = sim_owners.owner_id "
+               "WHERE NOT (sim.secret IS NULL);",
                lists:flatten(io_lib:format("~s",[Select_AST]))).
 
 select_theta_test() ->
