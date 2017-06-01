@@ -2,6 +2,10 @@
 
 ## Next release
 
+## v0.4.1
+
+- Allow select from another select statement
+
 ## v0.4.0
 
 - New join structure to allow multiple
