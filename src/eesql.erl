@@ -114,7 +114,8 @@
 
 %% Expressions for describing "tables" (eg. FROM in a SELECT statement)
 -type table_ref() :: table_primary()
-                   | joined_table().
+                   | joined_table()
+                   | {query_spec(), name()}.
 
 -type table_primary() :: name()
                        | {name(), name()}. %% AS
@@ -368,6 +369,16 @@ to_sql(P0, {value_expr_list, Row}) ->
     to_sql_fold(P0, value_expr, Row),
   {P1, {["(", intersperse(Values_Clause, ", "), ")"], Values_Parameters}};
 %% Serialize <table reference>
+to_sql(P0, {table_ref, {#select{} = Select, Alias}}) ->
+  {P1, {Clauses, Params}} = to_sql(P0, {sql_stmt, Select}),
+  %% Remove semicolon from select sql to avoid syntax error
+  %% TODO: The select shouldn't have the semicolon, which sould be added
+  %% at the end of any query, since semicolon can only happen once and at the end.
+  Clauses_Without_Semicolon = lists:droplast(Clauses),
+  {P1, {["(",
+         Clauses_Without_Semicolon,
+         ") AS ",
+         atom_to_binary(Alias, utf8)], Params}};
 to_sql(P0, {table_ref, #join{type = no_join,
                              table = Table,
                              joins = Joins}}) ->
