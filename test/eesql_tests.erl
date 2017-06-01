@@ -310,3 +310,11 @@ not_test() ->
   ?assertEqual([], Params),
   ?assertEqual("SELECT ALL * FROM trades WHERE (NOT (authorized IS NULL) AND NOT (created IS NULL));",
                lists:flatten(io_lib:format("~s",[Select_AST]))).
+
+select_from_select_test() ->
+  Bulks = #select{from = [bulks],
+                  columns = [id]},
+  {Select_AST, Params} = eesql:to_sql(#select{from = [{Bulks, alias}]}),
+  ?assertEqual([], Params),
+  ?assertEqual("SELECT ALL * FROM (SELECT ALL id FROM bulks) AS alias;",
+               lists:flatten(io_lib:format("~s",[Select_AST]))).
