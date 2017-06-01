@@ -2,6 +2,10 @@
 
 ## Next release
 
+## v0.4.2
+
+- Allow UNION and UNION ALL sql syntax
+
 ## v0.4.1
 
 - Allow select from another select statement
