@@ -66,7 +66,8 @@
       | insert_stmt()
       | update_stmt()
       | delete_stmt()
-      | truncate_stmt().
+      | truncate_stmt()
+      | union_stmt().
 
 %% Any name (column name, table name, alias, ...)
 -type name() :: atom().
@@ -226,6 +227,9 @@
 
 %% TRUNCATE
 -type truncate_stmt() :: #truncate{}.
+
+%% UNION
+-type union_stmt() :: #union{}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc X = [1,2,3], [1, x, 2, x, 3] = intersperse(X, x)
