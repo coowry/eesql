@@ -278,6 +278,22 @@ to_sql(Position, {sql_stmt, #truncate{table = Table, cascade = Cascade}}) ->
     true ->
       {Position, {["TRUNCATE ", name_to_sql(Table), " CASCADE;"], []}}
   end;
+to_sql(P, {sql_stmt, #union{type = Type, queries = Queries}}) ->
+  {P_Final, {Clauses, Params}} = 
+    lists:foldl(fun(S, {P0, {Clauses0, Params0}}) -> 
+                    {P1, {Clauses1, Params1}} = to_sql(P0, {sql_stmt, S}),
+                    %% Remove semicolon from select sql to avoid syntax error
+                    Clauses1_Without_Semicolon = lists:droplast(Clauses1),
+                    {P1, {Clauses0 ++ [Clauses1_Without_Semicolon], Params0 ++ Params1}}
+                end,
+                {P, {[], []}},
+                Queries),
+  Intersperse = 
+    case Type of
+      all -> " UNION ALL ";
+      null -> " UNION "
+    end,
+  {P_Final, {[intersperse(Clauses, Intersperse), ";"], Params}};
 to_sql(P0, {sql_stmt, #select{quantifier = Quant,
                               columns = Columns,
                               from = From,

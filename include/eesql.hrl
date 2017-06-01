@@ -34,6 +34,14 @@
   ).
 
 -record(
+   union,
+   {
+     type = null :: all | null, %% UNION ALL | UNION
+     queries :: [eesql:query_spec()]
+   }
+  ).
+
+-record(
    insert,
    {
      table :: eesql:table_name(),

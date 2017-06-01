@@ -288,8 +288,7 @@ distinct_count_test() ->
                lists:flatten(io_lib:format("~s",[Count_AST]))).
 
 select_in_test() ->
-  Bulks = #select{from = [bulks],
-                  columns = [id]},
+  Bulks = #select{from = [bulks], columns = [id]},
   {Select_AST, Params} = eesql:to_sql(#select{from = [trades], where = {in, bkid, Bulks}}),
   ?assertEqual([], Params),
   ?assertEqual("SELECT ALL * FROM trades WHERE bkid IN (SELECT ALL id FROM bulks);",
@@ -312,9 +311,26 @@ not_test() ->
                lists:flatten(io_lib:format("~s",[Select_AST]))).
 
 select_from_select_test() ->
-  Bulks = #select{from = [bulks],
-                  columns = [id]},
+  Bulks = #select{from = [bulks], columns = [id]},
   {Select_AST, Params} = eesql:to_sql(#select{from = [{Bulks, alias}]}),
   ?assertEqual([], Params),
   ?assertEqual("SELECT ALL * FROM (SELECT ALL id FROM bulks) AS alias;",
+               lists:flatten(io_lib:format("~s",[Select_AST]))).
+
+union_test() ->
+  S1 = #select{from = [trades], columns = [{count, {distinct, 'trades.sender'}}], where = {sort, '=', <<"p2p">>}},
+  S2 = #select{from = [trades], group_by = [sort]},
+  S3 = #select{columns=[username, name], from = [users], where = {name, '<=', <<"some_name">>}},
+  {Select_AST, Params} = eesql:to_sql(#union{queries = [S1, S2, S3]}),
+  ?assertEqual([<<"p2p">>, <<"some_name">>], Params),
+  ?assertEqual("SELECT ALL COUNT(DISTINCT trades.sender) FROM trades WHERE sort = $1 UNION SELECT ALL * FROM trades GROUP BY sort UNION SELECT ALL username, name FROM users WHERE name <= $2;",
+               lists:flatten(io_lib:format("~s",[Select_AST]))).
+
+union_all_test() ->
+  S1 = #select{from = [trades], columns = [{count, {distinct, 'trades.sender'}}], where = {sort, '=', <<"p2p">>}},
+  S2 = #select{from = [trades], group_by = [sort]},
+  S3 = #select{columns=[username, name], from = [users], where = {name, '<=', <<"some_name">>}},
+  {Select_AST, Params} = eesql:to_sql(#union{type = all, queries = [S1, S2, S3]}),
+  ?assertEqual([<<"p2p">>, <<"some_name">>], Params),
+  ?assertEqual("SELECT ALL COUNT(DISTINCT trades.sender) FROM trades WHERE sort = $1 UNION ALL SELECT ALL * FROM trades GROUP BY sort UNION ALL SELECT ALL username, name FROM users WHERE name <= $2;",
                lists:flatten(io_lib:format("~s",[Select_AST]))).
