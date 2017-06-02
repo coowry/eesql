@@ -2,6 +2,10 @@
 
 ## Next release
 
+## v0.4.3
+
+- Allow order by clause in unions
+
 ## v0.4.2
 
 - Allow UNION and UNION ALL sql syntax

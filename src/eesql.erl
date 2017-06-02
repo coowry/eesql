@@ -282,8 +282,8 @@ to_sql(Position, {sql_stmt, #truncate{table = Table, cascade = Cascade}}) ->
     true ->
       {Position, {["TRUNCATE ", name_to_sql(Table), " CASCADE;"], []}}
   end;
-to_sql(P, {sql_stmt, #union{type = Type, queries = Queries}}) ->
-  {P_Final, {Clauses, Params}} = 
+to_sql(P, {sql_stmt, #union{type = Type, queries = Queries, order_by = Sort_Specs}}) ->
+  {P2, {Clauses, Params}} = 
     lists:foldl(fun(S, {P0, {Clauses0, Params0}}) -> 
                     {P1, {Clauses1, Params1}} = to_sql(P0, {sql_stmt, S}),
                     %% Remove semicolon from select sql to avoid syntax error
@@ -292,12 +292,23 @@ to_sql(P, {sql_stmt, #union{type = Type, queries = Queries}}) ->
                 end,
                 {P, {[], []}},
                 Queries),
+  {P3, {Sort_Spec_Clauses, Sort_Specs_Params}} =
+    to_sql_fold(P2, sort_spec, Sort_Specs),
+  Order_By_Clause =
+    case Sort_Spec_Clauses of
+      [] -> "";
+      _ -> [" ORDER BY ", intersperse(Sort_Spec_Clauses, ", ")]
+    end,
   Intersperse = 
     case Type of
       all -> " UNION ALL ";
       null -> " UNION "
     end,
-  {P_Final, {[intersperse(Clauses, Intersperse), ";"], Params}};
+  {P3, {["(", 
+         intersperse(Clauses, Intersperse), 
+         ")",
+         Order_By_Clause,
+         ";"], Params ++ Sort_Specs_Params}};
 to_sql(P0, {sql_stmt, #select{quantifier = Quant,
                               columns = Columns,
                               from = From,
