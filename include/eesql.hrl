@@ -37,7 +37,8 @@
    union,
    {
      type = null :: all | null, %% UNION ALL | UNION
-     queries :: [eesql:query_spec()]
+     queries :: [eesql:query_spec()],
+     order_by = [] :: list(eesql:sort_spec()) %% (ORDER BY) Sort specification (<sort specification list>)
    }
   ).
 

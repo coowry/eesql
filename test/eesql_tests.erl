@@ -323,7 +323,7 @@ union_test() ->
   S3 = #select{columns=[username, name], from = [users], where = {name, '<=', <<"some_name">>}},
   {Select_AST, Params} = eesql:to_sql(#union{queries = [S1, S2, S3]}),
   ?assertEqual([<<"p2p">>, <<"some_name">>], Params),
-  ?assertEqual("SELECT ALL COUNT(DISTINCT trades.sender) FROM trades WHERE sort = $1 UNION SELECT ALL * FROM trades GROUP BY sort UNION SELECT ALL username, name FROM users WHERE name <= $2;",
+  ?assertEqual("(SELECT ALL COUNT(DISTINCT trades.sender) FROM trades WHERE sort = $1 UNION SELECT ALL * FROM trades GROUP BY sort UNION SELECT ALL username, name FROM users WHERE name <= $2);",
                lists:flatten(io_lib:format("~s",[Select_AST]))).
 
 union_all_test() ->
@@ -332,5 +332,14 @@ union_all_test() ->
   S3 = #select{columns=[username, name], from = [users], where = {name, '<=', <<"some_name">>}},
   {Select_AST, Params} = eesql:to_sql(#union{type = all, queries = [S1, S2, S3]}),
   ?assertEqual([<<"p2p">>, <<"some_name">>], Params),
-  ?assertEqual("SELECT ALL COUNT(DISTINCT trades.sender) FROM trades WHERE sort = $1 UNION ALL SELECT ALL * FROM trades GROUP BY sort UNION ALL SELECT ALL username, name FROM users WHERE name <= $2;",
+  ?assertEqual("(SELECT ALL COUNT(DISTINCT trades.sender) FROM trades WHERE sort = $1 UNION ALL SELECT ALL * FROM trades GROUP BY sort UNION ALL SELECT ALL username, name FROM users WHERE name <= $2);",
+               lists:flatten(io_lib:format("~s",[Select_AST]))).
+
+union_all_2_test() ->
+  S1 = #select{from = [trades], columns = [{count, {distinct, 'trades.sender'}}], where = {sort, '=', <<"p2p">>}},
+  S2 = #select{from = [trades], group_by = [sort]},
+  S3 = #select{columns=[username, name], from = [users], where = {name, '<=', <<"some_name">>}},
+  {Select_AST, Params} = eesql:to_sql(#union{type = all, queries = [S1, S2, S3], order_by = [{created, desc}, {id, desc}]}),
+  ?assertEqual([<<"p2p">>, <<"some_name">>], Params),
+  ?assertEqual("(SELECT ALL COUNT(DISTINCT trades.sender) FROM trades WHERE sort = $1 UNION ALL SELECT ALL * FROM trades GROUP BY sort UNION ALL SELECT ALL username, name FROM users WHERE name <= $2) ORDER BY created DESC, id DESC;",
                lists:flatten(io_lib:format("~s",[Select_AST]))).
