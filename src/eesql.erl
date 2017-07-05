@@ -1,4 +1,5 @@
-%% @author Angel Herranz <aherranz@gmail.com>
+%% @author Angel Herranz <angel.herranz@coowry.com>
+%%         Manuel Cherep <manuel.cherep@coowry.com>
 %%
 %% @copyright 2016 Coowry Ltd. - All rights reserved.
 %%
