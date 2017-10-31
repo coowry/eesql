@@ -8,7 +8,7 @@
 %%
 %% This HRL contains records to represent PG SQL Abstract Syntax
 %% Tree. Non-terminal symbols of the grammar are referenced according
-%% to http://savage.net.au/SQL/sql-2003-2.bnf.html
+%% to https://ronsavage.github.io/SQL/sql-2003-2.bnf.html
 -record(
    select,
    {
