@@ -1,5 +1,6 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Author: Angel Herranz <aherranz@gmail.com>
+%% @author Angel Herranz <angel.herranz@coowry.com>
+%%         Manuel Cherep <manuel.cherep@coowry.com>
 %%
 %% Copyright 2016, Coowry Ltd. - All rights reserved.
 %%
@@ -7,7 +8,7 @@
 %%
 %% This HRL contains records to represent PG SQL Abstract Syntax
 %% Tree. Non-terminal symbols of the grammar are referenced according
-%% to http://savage.net.au/SQL/sql-2003-2.bnf.html
+%% to https://ronsavage.github.io/SQL/sql-2003-2.bnf.html
 -record(
    select,
    {
@@ -74,4 +75,10 @@
   {
     table :: eesql:table_name(), %% CLEARS TABLE
     cascade = false :: boolean() %% CASCADE CLEANS ALSO FOREIGN KEYS
+  }).
+
+-record(
+  refresh,
+  {
+    materialized_view :: eesql:table_name() %% REFRESH MATERIALIZED VIEW
   }).

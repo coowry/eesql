@@ -343,3 +343,9 @@ union_all_2_test() ->
   ?assertEqual([<<"p2p">>, <<"some_name">>], Params),
   ?assertEqual("(SELECT ALL COUNT(DISTINCT trades.sender) FROM trades WHERE sort = $1 UNION ALL SELECT ALL * FROM trades GROUP BY sort UNION ALL SELECT ALL username, name FROM users WHERE name <= $2) ORDER BY created DESC, id DESC;",
                lists:flatten(io_lib:format("~s",[Select_AST]))).
+
+refresh_test() ->
+  {Refresh_AST, Params} = eesql:to_sql(#refresh{materialized_view = my_materialized_view}),
+  ?assertEqual([], Params),
+  ?assertEqual("REFRESH MATERIALIZED VIEW my_materialized_view;",
+               lists:flatten(io_lib:format("~s",[Refresh_AST]))).

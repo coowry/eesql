@@ -2,6 +2,11 @@
 
 ## Next release
 
+## v0.4.4
+
+- Refresh materialized views syntax supported
+- Documentation updated
+
 ## v0.4.3
 
 - Allow order by clause in unions
