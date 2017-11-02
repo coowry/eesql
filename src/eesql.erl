@@ -8,7 +8,7 @@
 %% @doc SQL Abstract Syntax Tree.
 %%
 %% Reference material:
-%% - http://savage.net.au/SQL/ (http://savage.net.au/SQL/sql-2003-2.bnf.html)
+%% - https://ronsavage.github.io/SQL/ (https://ronsavage.github.io/SQL/sql-2003-2.bnf.html)
 %% - Module epgsql.erl
 %% - http://www.postgresql.org/docs/current/static/sql.html
 %% - http://ns.inria.fr/ast/sql/index.html
@@ -17,7 +17,7 @@
 -include("include/eesql.hrl").
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Non terminal symbols from http://savage.net.au/SQL/sql-2003-2.bnf.html
+%% Non terminal symbols from https://ronsavage.github.io/SQL/sql-2003-2.bnf.html
 -export_type(
    [
     commit_stmt/0,
@@ -46,7 +46,7 @@
    ]
 ).
 
-%% TODO: convert to non terminal symbols from http://savage.net.au/SQL/sql-2003-2.bnf.html
+%% TODO: convert to non terminal symbols from https://ronsavage.github.io/SQL/sql-2003-2.bnf.html
 -export_type(
    [name/0,
     predicate/0,
