@@ -76,3 +76,9 @@
     table :: eesql:table_name(), %% CLEARS TABLE
     cascade = false :: boolean() %% CASCADE CLEANS ALSO FOREIGN KEYS
   }).
+
+-record(
+  refresh,
+  {
+    materialized_view :: eesql:table_name() %% REFRESH MATERIALIZED VIEW
+  }).
