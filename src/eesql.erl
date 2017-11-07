@@ -68,6 +68,7 @@
       | update_stmt()
       | delete_stmt()
       | truncate_stmt()
+      | refresh_stmt()
       | union_stmt().
 
 %% Any name (column name, table name, alias, ...)
@@ -228,6 +229,9 @@
 
 %% TRUNCATE
 -type truncate_stmt() :: #truncate{}.
+
+%% TRUNCATE
+-type refresh_stmt() :: #refresh{}.
 
 %% UNION
 -type union_stmt() :: #union{}.
