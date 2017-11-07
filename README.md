@@ -2,6 +2,10 @@
 
 ## Next release
 
+## v0.4.5
+
+- Minor fix in a specification
+
 ## v0.4.4
 
 - Refresh materialized views syntax supported
