@@ -2,6 +2,8 @@
 
 ## Next release
 
+- Minor fix in intersperse/2 specification
+
 ## v0.4.5
 
 - Minor fix in a specification
