@@ -238,7 +238,7 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc X = [1,2,3], [1, x, 2, x, 3] = intersperse(X, x)
--spec intersperse(list(),list()) -> list().
+-spec intersperse(list(), any()) -> list().
 intersperse([], _) -> [];
 intersperse([X | Xs], I) ->
   [X | lists:foldr(fun(Y, Acc) -> [I, Y | Acc] end,
