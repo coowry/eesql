@@ -82,3 +82,13 @@
   {
     materialized_view :: eesql:table_name() %% REFRESH MATERIALIZED VIEW
   }).
+
+-record(
+   with,
+   {
+     definitions :: [{eesql:name(), eesql:insert_stmt()
+		      | eesql:query_spec()
+		      | eesql:update_stmt()
+		      | eesql:delete_stmt()}],
+     select :: eesql:query_spec()
+   }).
