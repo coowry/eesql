@@ -84,7 +84,7 @@
   }).
 
 -record(
-   with,
+   pg_with,
    {
      definitions :: [{eesql:name(), eesql:insert_stmt()
 		      | eesql:query_spec()
