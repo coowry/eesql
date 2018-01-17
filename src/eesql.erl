@@ -255,8 +255,8 @@ intersperse([X | Xs], I) ->
                                    Params :: [literal()].
 to_sql(Statement) ->
   Position = 1,
-  {_Last_Pos, Result} = to_sql(Position, {sql_stmt, Statement}),
-  Result.
+  {_Last_Pos, {Equery, Params}} = to_sql(Position, {sql_stmt, Statement}),
+  {[Equery, ";"], Params}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Serializes SQL (sub)sentences.
@@ -276,23 +276,23 @@ to_sql(Statement) ->
                  Params :: [literal()].
 %% Serialize SQL statement
 to_sql(Position, {sql_stmt, start_transaction}) ->
-  {Position, {"BEGIN TRANSACTION;", []}};
+  {Position, {"BEGIN TRANSACTION", []}};
 to_sql(Position, {sql_stmt, commit}) ->
-  {Position, {"COMMIT;", []}};
+  {Position, {"COMMIT", []}};
 to_sql(Position, {sql_stmt, commit_and_chain}) ->
-  {Position, {"COMMIT AND CHAIN;", []}};
+  {Position, {"COMMIT AND CHAIN", []}};
 to_sql(Position, {sql_stmt, commit_and_no_chain}) ->
-  {Position, {"COMMIT AND NO CHAIN;", []}};
+  {Position, {"COMMIT AND NO CHAIN", []}};
 to_sql(Position, {sql_stmt, rollback}) ->
-  {Position, {"ROLLBACK;", []}};
+  {Position, {"ROLLBACK", []}};
 to_sql(Position, {sql_stmt, #refresh{materialized_view = View}}) ->
-  {Position, {["REFRESH MATERIALIZED VIEW ", name_to_sql(View), ";"], []}};
+  {Position, {["REFRESH MATERIALIZED VIEW ", name_to_sql(View)], []}};
 to_sql(Position, {sql_stmt, #truncate{table = Table, cascade = Cascade}}) ->
   case Cascade of
     false ->
-      {Position, {["TRUNCATE ", name_to_sql(Table), ";"], []}};
+      {Position, {["TRUNCATE ", name_to_sql(Table)], []}};
     true ->
-      {Position, {["TRUNCATE ", name_to_sql(Table), " CASCADE;"], []}}
+      {Position, {["TRUNCATE ", name_to_sql(Table), " CASCADE"], []}}
   end;
 to_sql(P, {sql_stmt, #union{type = Type, queries = Queries, order_by = Sort_Specs}}) ->
   {P2, {Clauses, Params}} = 
@@ -319,8 +319,7 @@ to_sql(P, {sql_stmt, #union{type = Type, queries = Queries, order_by = Sort_Spec
   {P3, {["(", 
          intersperse(Clauses, Intersperse), 
          ")",
-         Order_By_Clause,
-         ";"], Params ++ Sort_Specs_Params}};
+         Order_By_Clause], Params ++ Sort_Specs_Params}};
 to_sql(P0, {sql_stmt, #select{quantifier = Quant,
                               columns = Columns,
                               from = From,
@@ -366,8 +365,7 @@ to_sql(P0, {sql_stmt, #select{quantifier = Quant,
          Order_By_Clause,
          Group_By_Clause,
          Offset_Clause,
-         For_Update_Clause,
-         ";"], 
+         For_Update_Clause],
         Table_Ref_Parameters ++ Where_Parameters ++ Sort_Specs_Parameters ++ Offset_Params}};
 to_sql(P0, {sql_stmt, #insert{table = Table, 
                               columns = Columns, 
@@ -382,7 +380,7 @@ to_sql(P0, {sql_stmt, #insert{table = Table,
          " VALUES ",
          intersperse(Values_Clause, ", "),
          Conflict_Clause,
-         " RETURNING *;"], Values_Parameters ++ Conflict_Params}};
+         " RETURNING *"], Values_Parameters ++ Conflict_Params}};
 to_sql(P0, {sql_stmt, #update{table = Table,
                               set = Set,
                               where = Where}}) ->
@@ -400,11 +398,11 @@ to_sql(P0, {sql_stmt, #update{table = Table,
          " SET ",
          intersperse(Set_Clause, ", "),
          Where_Clause,
-         " RETURNING *;"], Set_Parameters ++ Where_Parameters}};
+         " RETURNING *"], Set_Parameters ++ Where_Parameters}};
 to_sql(P0, {sql_stmt, #delete{table = Table,
                               where = Where}}) ->
   {P1, {Where_Clause, Where_Parameters}} = to_sql(P0, {where_clause, Where}),
-  {P1, {["DELETE FROM ", name_to_sql(Table), Where_Clause, " RETURNING *;"], Where_Parameters}};
+  {P1, {["DELETE FROM ", name_to_sql(Table), Where_Clause, " RETURNING *"], Where_Parameters}};
 %% Serialize <contextually typed row value expression list>
 %% Serialize a values clause
 to_sql(P0, {sql_stmt, #with{definitions = Definitions,
