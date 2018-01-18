@@ -43,7 +43,7 @@
     
     update_stmt/0,
     value_expr/0,
-    with_as/0
+    pg_with_as/0
    ]
 ).
 
@@ -71,7 +71,7 @@
       | truncate_stmt()
       | refresh_stmt()
       | union_stmt()
-      | with_as().
+      | pg_with_as().
 
 %% Any name (column name, table name, alias, ...)
 -type name() :: atom().
@@ -239,7 +239,7 @@
 -type union_stmt() :: #union{}.
 
 %% WITH AS
--type with_as() :: #with{}.
+-type pg_with_as() :: #pg_with{}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc X = [1,2,3], [1, x, 2, x, 3] = intersperse(X, x)
@@ -405,12 +405,12 @@ to_sql(P0, {sql_stmt, #delete{table = Table,
   {P1, {["DELETE FROM ", name_to_sql(Table), Where_Clause, " RETURNING *"], Where_Parameters}};
 %% Serialize <contextually typed row value expression list>
 %% Serialize a values clause
-to_sql(P0, {sql_stmt, #with{definitions = Definitions,
+to_sql(P0, {sql_stmt, #pg_with{definitions = Definitions,
 			    select = Select}}) ->
   {P1, {Query_Clause, Query_Params}} =
     lists:foldl(fun({Name, Query}, {PI, {Accum_SQL, Accum_Params}}) ->
 		    {PJ, {Expr_SQL, Expr_Params}} = to_sql(PI, {sql_stmt, Query}),
-		    {PJ, {Accum_SQL ++ [[name_to_sql(Name), " AS (", lists:droplast(Expr_SQL), ")"]], Accum_Params ++ Expr_Params}}
+		    {PJ, {Accum_SQL ++ [[name_to_sql(Name), " AS (", Expr_SQL, ")"]], Accum_Params ++ Expr_Params}}
 		end,
 	       {P0, {[], []}},
 	       Definitions),
