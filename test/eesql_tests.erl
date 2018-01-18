@@ -349,3 +349,15 @@ refresh_test() ->
   ?assertEqual([], Params),
   ?assertEqual("REFRESH MATERIALIZED VIEW my_materialized_view;",
                lists:flatten(io_lib:format("~s",[Refresh_AST]))).
+
+with_as_test() ->
+  {With_As_AST, Params} = eesql:to_sql(#pg_with{definitions = [{data_for_user, #select{columns = [username, name],
+										       from = [users],
+										       where = {name, '=', <<"some_name">>}}
+							       }],
+						select = #select{columns = [country, {count, all}],
+								 from = [data_for_user],
+								 group_by = [country]}}),
+  ?assertEqual([<<"some_name">>], Params),
+  ?assertEqual("WITH data_for_user AS (SELECT ALL username, name FROM users WHERE name = $1) SELECT ALL country, COUNT(*) FROM data_for_user GROUP BY country;",	       
+lists:flatten(io_lib:format("~s", [With_As_AST]))).
