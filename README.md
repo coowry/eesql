@@ -2,10 +2,15 @@
 
 ## Next release
 
+## v0.4.7
+
+- No changes regarding the previous version except
+  the versioning file.
 
 ## v0.4.6
 
-- Allow SELECT queries in WITH queries for postgresql syntax
+- Allow SELECT queries in WITH queries for postgresql syntax.
+  (Failed release beacuse of failure in versioning file)
 
 ## v0.4.5
 
