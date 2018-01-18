@@ -42,7 +42,8 @@
     table_primary/0,
     
     update_stmt/0,
-    value_expr/0
+    value_expr/0,
+    pg_with_as/0
    ]
 ).
 
@@ -69,7 +70,8 @@
       | delete_stmt()
       | truncate_stmt()
       | refresh_stmt()
-      | union_stmt().
+      | union_stmt()
+      | pg_with_as().
 
 %% Any name (column name, table name, alias, ...)
 -type name() :: atom().
@@ -236,9 +238,12 @@
 %% UNION
 -type union_stmt() :: #union{}.
 
+%% WITH AS
+-type pg_with_as() :: #pg_with{}.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc X = [1,2,3], [1, x, 2, x, 3] = intersperse(X, x)
--spec intersperse(list(),list()) -> list().
+-spec intersperse(list(), any()) -> list().
 intersperse([], _) -> [];
 intersperse([X | Xs], I) ->
   [X | lists:foldr(fun(Y, Acc) -> [I, Y | Acc] end,
@@ -250,8 +255,8 @@ intersperse([X | Xs], I) ->
                                    Params :: [literal()].
 to_sql(Statement) ->
   Position = 1,
-  {_Last_Pos, Result} = to_sql(Position, {sql_stmt, Statement}),
-  Result.
+  {_Last_Pos, {Equery, Params}} = to_sql(Position, {sql_stmt, Statement}),
+  {[Equery, ";"], Params}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Serializes SQL (sub)sentences.
@@ -271,23 +276,23 @@ to_sql(Statement) ->
                  Params :: [literal()].
 %% Serialize SQL statement
 to_sql(Position, {sql_stmt, start_transaction}) ->
-  {Position, {"BEGIN TRANSACTION;", []}};
+  {Position, {"BEGIN TRANSACTION", []}};
 to_sql(Position, {sql_stmt, commit}) ->
-  {Position, {"COMMIT;", []}};
+  {Position, {"COMMIT", []}};
 to_sql(Position, {sql_stmt, commit_and_chain}) ->
-  {Position, {"COMMIT AND CHAIN;", []}};
+  {Position, {"COMMIT AND CHAIN", []}};
 to_sql(Position, {sql_stmt, commit_and_no_chain}) ->
-  {Position, {"COMMIT AND NO CHAIN;", []}};
+  {Position, {"COMMIT AND NO CHAIN", []}};
 to_sql(Position, {sql_stmt, rollback}) ->
-  {Position, {"ROLLBACK;", []}};
+  {Position, {"ROLLBACK", []}};
 to_sql(Position, {sql_stmt, #refresh{materialized_view = View}}) ->
-  {Position, {["REFRESH MATERIALIZED VIEW ", name_to_sql(View), ";"], []}};
+  {Position, {["REFRESH MATERIALIZED VIEW ", name_to_sql(View)], []}};
 to_sql(Position, {sql_stmt, #truncate{table = Table, cascade = Cascade}}) ->
   case Cascade of
     false ->
-      {Position, {["TRUNCATE ", name_to_sql(Table), ";"], []}};
+      {Position, {["TRUNCATE ", name_to_sql(Table)], []}};
     true ->
-      {Position, {["TRUNCATE ", name_to_sql(Table), " CASCADE;"], []}}
+      {Position, {["TRUNCATE ", name_to_sql(Table), " CASCADE"], []}}
   end;
 to_sql(P, {sql_stmt, #union{type = Type, queries = Queries, order_by = Sort_Specs}}) ->
   {P2, {Clauses, Params}} = 
@@ -314,8 +319,7 @@ to_sql(P, {sql_stmt, #union{type = Type, queries = Queries, order_by = Sort_Spec
   {P3, {["(", 
          intersperse(Clauses, Intersperse), 
          ")",
-         Order_By_Clause,
-         ";"], Params ++ Sort_Specs_Params}};
+         Order_By_Clause], Params ++ Sort_Specs_Params}};
 to_sql(P0, {sql_stmt, #select{quantifier = Quant,
                               columns = Columns,
                               from = From,
@@ -361,8 +365,7 @@ to_sql(P0, {sql_stmt, #select{quantifier = Quant,
          Order_By_Clause,
          Group_By_Clause,
          Offset_Clause,
-         For_Update_Clause,
-         ";"], 
+         For_Update_Clause],
         Table_Ref_Parameters ++ Where_Parameters ++ Sort_Specs_Parameters ++ Offset_Params}};
 to_sql(P0, {sql_stmt, #insert{table = Table, 
                               columns = Columns, 
@@ -377,7 +380,7 @@ to_sql(P0, {sql_stmt, #insert{table = Table,
          " VALUES ",
          intersperse(Values_Clause, ", "),
          Conflict_Clause,
-         " RETURNING *;"], Values_Parameters ++ Conflict_Params}};
+         " RETURNING *"], Values_Parameters ++ Conflict_Params}};
 to_sql(P0, {sql_stmt, #update{table = Table,
                               set = Set,
                               where = Where}}) ->
@@ -395,13 +398,27 @@ to_sql(P0, {sql_stmt, #update{table = Table,
          " SET ",
          intersperse(Set_Clause, ", "),
          Where_Clause,
-         " RETURNING *;"], Set_Parameters ++ Where_Parameters}};
+         " RETURNING *"], Set_Parameters ++ Where_Parameters}};
 to_sql(P0, {sql_stmt, #delete{table = Table,
                               where = Where}}) ->
   {P1, {Where_Clause, Where_Parameters}} = to_sql(P0, {where_clause, Where}),
-  {P1, {["DELETE FROM ", name_to_sql(Table), Where_Clause, " RETURNING *;"], Where_Parameters}};
+  {P1, {["DELETE FROM ", name_to_sql(Table), Where_Clause, " RETURNING *"], Where_Parameters}};
 %% Serialize <contextually typed row value expression list>
 %% Serialize a values clause
+to_sql(P0, {sql_stmt, #pg_with{definitions = Definitions,
+			    select = Select}}) ->
+  {P1, {Query_Clause, Query_Params}} =
+    lists:foldl(fun({Name, Query}, {PI, {Accum_SQL, Accum_Params}}) ->
+		    {PJ, {Expr_SQL, Expr_Params}} = to_sql(PI, {sql_stmt, Query}),
+		    {PJ, {Accum_SQL ++ [[name_to_sql(Name), " AS (", Expr_SQL, ")"]], Accum_Params ++ Expr_Params}}
+		end,
+	       {P0, {[], []}},
+	       Definitions),
+  {P2, {Select_Clause, Select_Params}} = to_sql(P1, {sql_stmt, Select}),
+  {P2, {["WITH ",
+	 intersperse(Query_Clause, ", "),
+	 " ",
+	 Select_Clause], Query_Params ++ Select_Params}};
 to_sql(P0, {value_expr_list, Row}) ->
   {P1, {Values_Clause, Values_Parameters}} = 
     to_sql_fold(P0, value_expr, Row),

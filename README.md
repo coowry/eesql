@@ -2,6 +2,11 @@
 
 ## Next release
 
+
+## v0.4.6
+
+- Allow SELECT queries in WITH queries for postgresql syntax
+
 ## v0.4.5
 
 - Minor fix in a specification
