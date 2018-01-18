@@ -82,3 +82,10 @@
   {
     materialized_view :: eesql:table_name() %% REFRESH MATERIALIZED VIEW
   }).
+
+-record(
+   pg_with,
+   {
+     definitions :: [{eesql:name(), eesql:query_spec()}],
+     select :: eesql:query_spec()
+   }).
