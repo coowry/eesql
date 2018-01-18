@@ -86,9 +86,6 @@
 -record(
    pg_with,
    {
-     definitions :: [{eesql:name(), eesql:insert_stmt()
-		      | eesql:query_spec()
-		      | eesql:update_stmt()
-		      | eesql:delete_stmt()}],
+     definitions :: [{eesql:name(), eesql:query_spec()}],
      select :: eesql:query_spec()
    }).
