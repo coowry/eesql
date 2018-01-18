@@ -2,7 +2,10 @@
 
 ## Next release
 
-- Minor fix in intersperse/2 specification
+
+## v0.4.6
+
+- Allow SELECT queries in WITH queries for postgresql syntax
 
 ## v0.4.5
 
