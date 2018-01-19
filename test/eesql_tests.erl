@@ -269,6 +269,12 @@ group_by_test() ->
   ?assertEqual("SELECT ALL * FROM trades GROUP BY sort;",
                lists:flatten(io_lib:format("~s",[Group_AST]))).
 
+group_by2_test() ->
+  {Group_AST, Params} = eesql:to_sql(#select{from = [trades], group_by = [sort], order_by = [sort]}),
+  ?assertEqual([], Params),
+  ?assertEqual("SELECT ALL * FROM trades GROUP BY sort ORDER BY sort;",
+               lists:flatten(io_lib:format("~s",[Group_AST]))).
+
 count_all_test() ->
   {Count_AST, Params} = eesql:to_sql(#select{from = [trades], columns = [{count, all}]}),
   ?assertEqual([], Params),
