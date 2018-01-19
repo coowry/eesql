@@ -17,8 +17,8 @@
      %% <table expression> from here
      from :: eesql:from_clause(), %% (FROM) Source of data, table names for the moment (<from clause>)
      where :: eesql:predicate() | undefined, %% (WHERE) search condition (<where clause>)
-     order_by = [] :: list(eesql:sort_spec()), %% (ORDER BY) Sort specification (<sort specification list>)
      group_by = [] :: list(eesql:column_name()), %% TODO: Group by expression
+     order_by = [] :: list(eesql:sort_spec()), %% (ORDER BY) Sort specification (<sort specification list>)
      offset :: {non_neg_integer(), non_neg_integer()} | undefined, %% (OFFSET/FETCH)
      for_update = false :: boolean() %% Decides if a select is done for update or not
    }

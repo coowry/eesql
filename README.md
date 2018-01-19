@@ -2,6 +2,10 @@
 
 ## Next release
 
+## v0.4.8
+
+- Fix SELECT statement according to PostgreSQL syntax.
+
 ## v0.4.7
 
 - No changes regarding the previous version except
