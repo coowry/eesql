@@ -324,8 +324,8 @@ to_sql(P0, {sql_stmt, #select{quantifier = Quant,
                               columns = Columns,
                               from = From,
                               where = Where,
-                              order_by = Sort_Specs,
                               group_by = Group_By,
+                              order_by = Sort_Specs,
                               offset = Offset,
                               for_update = For_Update}}) ->
   Quant_SQL = set_quant_to_sql(Quant),
@@ -340,11 +340,6 @@ to_sql(P0, {sql_stmt, #select{quantifier = Quant,
   {P2, {Where_Clause, Where_Parameters}} = to_sql(P1, {where_clause, Where}),
   {P3, {Sort_Spec_Clauses, Sort_Specs_Parameters}} =
     to_sql_fold(P2, sort_spec, Sort_Specs),
-  Order_By_Clause =
-    case Sort_Spec_Clauses of
-      [] -> "";
-      _ -> [" ORDER BY ", intersperse(Sort_Spec_Clauses, ", ")]
-    end,
   %% TODO: Group By expression, not only a list of columns.
   case Group_By of
     [] ->
@@ -352,6 +347,11 @@ to_sql(P0, {sql_stmt, #select{quantifier = Quant,
     _ ->
       Group_By_Clause = [" GROUP BY ", intersperse([derived_col_to_sql(Column) || Column <- Group_By], ", ")]
   end,
+  Order_By_Clause =
+    case Sort_Spec_Clauses of
+      [] -> "";
+      _ -> [" ORDER BY ", intersperse(Sort_Spec_Clauses, ", ")]
+    end,
   {P4, {Offset_Clause, Offset_Params}} = to_sql(P3, {offset, Offset}),
   case For_Update of
     false ->
@@ -362,8 +362,8 @@ to_sql(P0, {sql_stmt, #select{quantifier = Quant,
   {P4, {["SELECT ", Quant_SQL, " ", Items,
          [" FROM ", intersperse(Table_Ref_Clauses, ", ")],
          Where_Clause,
-         Order_By_Clause,
          Group_By_Clause,
+         Order_By_Clause,
          Offset_Clause,
          For_Update_Clause],
         Table_Ref_Parameters ++ Where_Parameters ++ Sort_Specs_Parameters ++ Offset_Params}};
