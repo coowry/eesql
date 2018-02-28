@@ -2,6 +2,10 @@
 
 ## Next release
 
+## v0.4.9
+
+- Minor fix in REFRESH MATERIALIZED VIEW statement
+
 ## v0.4.8
 
 - Fix SELECT statement according to PostgreSQL syntax.
