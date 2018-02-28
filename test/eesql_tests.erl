@@ -351,7 +351,7 @@ union_all_2_test() ->
                lists:flatten(io_lib:format("~s",[Select_AST]))).
 
 refresh_test() ->
-  {Refresh_AST, Params} = eesql:to_sql(#refresh{materialized_view = my_materialized_view}),
+  {Refresh_AST, Params} = eesql:to_sql(#pg_refresh{materialized_view = my_materialized_view}),
   ?assertEqual([], Params),
   ?assertEqual("REFRESH MATERIALIZED VIEW my_materialized_view;",
                lists:flatten(io_lib:format("~s",[Refresh_AST]))).

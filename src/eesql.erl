@@ -69,7 +69,7 @@
       | update_stmt()
       | delete_stmt()
       | truncate_stmt()
-      | refresh_stmt()
+      | pg_refresh_stmt()
       | union_stmt()
       | pg_with_as().
 
@@ -233,7 +233,7 @@
 -type truncate_stmt() :: #truncate{}.
 
 %% TRUNCATE
--type refresh_stmt() :: #refresh{}.
+-type pg_refresh_stmt() :: #pg_refresh{}.
 
 %% UNION
 -type union_stmt() :: #union{}.
@@ -285,7 +285,7 @@ to_sql(Position, {sql_stmt, commit_and_no_chain}) ->
   {Position, {"COMMIT AND NO CHAIN", []}};
 to_sql(Position, {sql_stmt, rollback}) ->
   {Position, {"ROLLBACK", []}};
-to_sql(Position, {sql_stmt, #refresh{materialized_view = View}}) ->
+to_sql(Position, {sql_stmt, #pg_refresh{materialized_view = View}}) ->
   {Position, {["REFRESH MATERIALIZED VIEW ", name_to_sql(View)], []}};
 to_sql(Position, {sql_stmt, #truncate{table = Table, cascade = Cascade}}) ->
   case Cascade of

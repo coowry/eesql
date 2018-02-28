@@ -78,7 +78,7 @@
   }).
 
 -record(
-  refresh,
+  pg_refresh,
   {
     materialized_view :: eesql:table_name() %% REFRESH MATERIALIZED VIEW
   }).
