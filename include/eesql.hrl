@@ -89,3 +89,10 @@
      definitions :: [{eesql:name(), eesql:query_spec()}],
      select :: eesql:query_spec()
    }).
+
+-record(
+   pg_call,                                     % FUNCTION CALL in FROM CLAUSE
+   {
+     name :: eesql:name(),
+     args :: list(eesql:value_expr())
+   }).

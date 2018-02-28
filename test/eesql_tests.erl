@@ -323,6 +323,36 @@ select_from_select_test() ->
   ?assertEqual("SELECT ALL * FROM (SELECT ALL id FROM bulks) AS alias;",
                lists:flatten(io_lib:format("~s",[Select_AST]))).
 
+select_from_function_call_test() ->
+  Function = #pg_call{name = total_balance , args = [<<"agid">>]},
+  {Select_AST, Params} = eesql:to_sql(#select{from = [Function]}),
+  ?assertEqual([<<"agid">>], Params),
+  ?assertEqual("SELECT ALL * FROM total_balance($1);",
+              lists:flatten(io_lib:format("~s", [Select_AST]))).
+
+select_from_function_call_no_args_test() ->
+  Function = #pg_call{name = user_info, args = []},
+  {Select_AST, Params} = eesql:to_sql(#select{from = [Function]}),
+  ?assertEqual([], Params),
+  ?assertEqual("SELECT ALL * FROM user_info();",
+               lists:flatten(io_lib:format("~s", [Select_AST]))).
+
+select_from_function_call_more_args_test() ->
+  Function = #pg_call{name = all_transactions, args = [725846400, 1519220895]},
+  {Select_AST, Params} = eesql:to_sql(#select{columns = [trades],
+                                              from = [Function]}),
+  ?assertEqual([725846400,1519220895], Params),
+  ?assertEqual("SELECT ALL trades FROM all_transactions($1, $2);",
+               lists:flatten(io_lib:format("~s", [Select_AST]))).
+
+select_from_function_call_fun_argument_test() ->
+  Function  = #pg_call{name = products,
+                       args = [{<<"country">>, [<<"ES">>]}]},
+  {Select_AST, Params} = eesql:to_sql(#select{from = [Function]}),
+  ?assertEqual([<<"ES">>], Params),
+  ?assertEqual("SELECT ALL * FROM products(country($1));",
+              lists:flatten(io_lib:format("~s", [Select_AST]))).
+
 union_test() ->
   S1 = #select{from = [trades], columns = [{count, {distinct, 'trades.sender'}}], where = {sort, '=', <<"p2p">>}},
   S2 = #select{from = [trades], group_by = [sort]},
