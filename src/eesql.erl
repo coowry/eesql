@@ -42,8 +42,14 @@
     table_primary/0,
     
     update_stmt/0,
-    value_expr/0,
-    pg_with_as/0
+    value_expr/0
+   ]
+).
+
+-export_type(
+   [
+    pg_with_as/0,
+    pg_call/0
    ]
 ).
 
@@ -120,7 +126,8 @@
 %% Expressions for describing "tables" (eg. FROM in a SELECT statement)
 -type table_ref() :: table_primary()
                    | joined_table()
-                   | {query_spec(), name()}.
+                   | {query_spec(), name()}
+                   | pg_call().
 
 -type table_primary() :: name()
                        | {name(), name()}. %% AS
@@ -240,6 +247,9 @@
 
 %% WITH AS
 -type pg_with_as() :: #pg_with{}.
+
+%% Table function call
+-type pg_call() :: #pg_call{}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc X = [1,2,3], [1, x, 2, x, 3] = intersperse(X, x)
@@ -434,6 +444,13 @@ to_sql(P0, {table_ref, {#select{} = Select, Alias}}) ->
          Clauses_Without_Semicolon,
          ") AS ",
          atom_to_binary(Alias, utf8)], Params}};
+to_sql(P0, {table_ref, #pg_call{name = Name,
+                                args = Args}}) ->
+  {P1, {Args_Clauses, Args_Params}} = to_sql_fold(P0, value_expr, Args),
+  {P1, {[name_to_sql(Name),
+         "(",
+         intersperse(Args_Clauses, ", "),
+        ")"], Args_Params}};
 to_sql(P0, {table_ref, #join{type = no_join,
                              table = Table,
                              joins = Joins}}) ->
