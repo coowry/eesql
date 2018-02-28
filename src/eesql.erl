@@ -69,7 +69,7 @@
       | update_stmt()
       | delete_stmt()
       | truncate_stmt()
-      | refresh_stmt()
+      | pg_refresh_stmt()
       | union_stmt()
       | pg_with_as().
 
@@ -233,7 +233,7 @@
 -type truncate_stmt() :: #truncate{}.
 
 %% TRUNCATE
--type refresh_stmt() :: #pg_refresh{}.
+-type pg_refresh_stmt() :: #pg_refresh{}.
 
 %% UNION
 -type union_stmt() :: #union{}.
