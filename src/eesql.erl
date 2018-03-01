@@ -662,10 +662,12 @@ derived_col_to_sql({Column, Alias}) ->
   [name_to_sql(Column), " AS ", name_to_sql(Alias)].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% @doc Serialize a name
+%% @doc Serialize an identifier
 -spec name_to_sql(name()) -> iodata().
 name_to_sql(Name) ->
-  atom_to_binary(Name, utf8).
+  Identifier = atom_to_binary(Name, utf8),
+  %% TODO: check that the identifiers is wellformed (regular and delimited identifiers), the most proper way to do it us by using a regular expression (precompiled) and checkit.
+  Identifier.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Returns placeholder according to position
