@@ -8,10 +8,12 @@
 %% @doc SQL Abstract Syntax Tree.
 %%
 %% Reference material:
-%% - https://ronsavage.github.io/SQL/ (https://ronsavage.github.io/SQL/sql-2003-2.bnf.html)
-%% - Module epgsql.erl
-%% - http://www.postgresql.org/docs/current/static/sql.html
-%% - http://ns.inria.fr/ast/sql/index.html
+%% - USING: https://ronsavage.github.io/SQL/ (https://ronsavage.github.io/SQL/sql-2003-2.bnf.html)
+%% - As a reference: Module epgsql.erl
+%% - As a reference: http://www.postgresql.org/docs/current/static/sql.html
+%% - As a reference: https://docs.jboss.org/author/display/teiid81final/BNF+for+SQL+Grammar
+%% - As a reference: http://ns.inria.fr/ast/sql/index.html
+%% - To be reviewed: https://jakewheat.github.io/sql-overview/sql-2011-foundation-grammar.html
 -module(eesql).
 
 -include("include/eesql.hrl").
