@@ -80,7 +80,21 @@
       | pg_with_as().
 
 %% Any name (column name, table name, alias, ...)
+%% TODO: To be deprecated
 -type name() :: atom().
+
+%% <identfier> ::= <actual identifier>
+%% <actual identifier> ::= <regular identifier> | <delimited identifier>
+%% <regular identifier> ::= <identifier body>
+%% <identifier body> ::= <identifier start> [ <identifier part> ... ]
+%% <identifier part> ::= <identifier start> | <identifier extend>
+%% <delimited identifier> ::= <double quote> <delimited identifier body> <double quote>
+%% <delimited identifier body> ::= <delimited identifier part> ...
+%% <delimited identifier part> ::= <nondoublequote character> | <doublequote symbol>
+-type id() :: atom().
+
+%% <identifier chain> ::= <identifier> [ { <period> <identifier> }... ]
+-type identifier_chain() :: atom().
 
 %% <literal> (any SQL literal, for the moment just inspired by epgsql:bind_param())
 %% <literal> ::= <signed numeric literal> | <general literal>
@@ -110,7 +124,7 @@
 -type table_name() :: name().
 
 %% <column name>
--type column_name() :: name().
+-type column_name() :: id().
 
 %% <row value expression>
 -type row_value_expr() :: nonempty_list(literal()).
@@ -193,7 +207,7 @@
 %% | <routine invocation>
 %% | <next value expression>
 -type value_expr() ::
-        column_name() %% <column reference>
+        identifier_chain() %% <column reference>
       | {function_name(), [value_expr()]} %% Represents function calls (a lot of clauses such us <fold>, <trim>, <natural logarithm>, ...
       | [value_expr()] % Array (maybe nested)
       | literal().
@@ -279,7 +293,9 @@ to_sql(Statement) ->
              | {table_ref, table_ref()}
              | {literal, literal()}
              | {offset, undefined | {pos_integer(), pos_integer()}}
-             | {on_conflict_update_target, undefined | [column_name()], [column_name()]})
+             | {on_conflict_update_target, undefined | [column_name()], [column_name()]}
+             | {identifier, id()}
+             | {identifier_chain, identifier_chain()})
             -> {Pos, {Equery, Params}}
             when Pos :: pos_integer(),
                  Equery :: iodata(),
@@ -482,7 +498,9 @@ to_sql(P0, {table_ref, {Table_Name, Correlation_Name}}) ->
          atom_to_binary(Correlation_Name, utf8)], 
         []}};
 to_sql(P0, {table_ref, Table_Name}) ->
-  {P0, {atom_to_binary(Table_Name, utf8), []}};
+  to_sql(P0, {identifier, Table_Name});
+to_sql(P0, {identifier, Id}) ->
+  {P0, {name_to_sql(Id), []}};
 %% Serialize <where clause>
 to_sql(P0, {where_clause, undefined}) ->
   {P0, {"", []}};
@@ -607,7 +625,9 @@ to_sql(P0, {value_expr, Column}) when is_atom(Column),
                                       Column /= null,
                                       Column /= true,
                                       Column /= false ->
-  {P0, {name_to_sql(Column), []}};
+  to_sql(P0, {identifier_chain, Column});
+to_sql(P0, {identifier_chain, Id}) ->
+  {P0, {name_to_sql(Id), []}};
 to_sql(P0, {value_expr, {Function_Name, Actual_Args}})
   when is_binary(Function_Name) ->
   {P1, {Args_SQLs, Args_Params}} = 
@@ -663,11 +683,19 @@ derived_col_to_sql({Column, Alias}) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Serialize an identifier
--spec name_to_sql(name()) -> iodata().
+-spec name_to_sql(identifier_chain() | id()) -> iodata().
 name_to_sql(Name) ->
   Identifier = atom_to_binary(Name, utf8),
-  %% TODO: check that the identifiers is wellformed (regular and delimited identifiers), the most proper way to do it us by using a regular expression (precompiled) and checkit.
-  Identifier.
+  Regex = "^[a-zA-Z][a-zA-Z0-9_]*[\.a-zA-Z0-9_]*$|[a-zA-Z][a-zA-Z0-9_]*|^\"[a-zA-Z][a-zA-Z0-9_]*\"$",
+  {ok, MP} = re:compile(Regex),
+  case re:run(Identifier, MP) of
+    {match, [{0,0}]} ->
+      throw(non_valid_identifier);
+    {match, _Captured} ->
+      Identifier;
+    nomatch ->
+      throw(non_valid_identifier)
+  end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Returns placeholder according to position
