@@ -12,6 +12,9 @@
 
 ## Next release
 
+- [T] Refactor: using identifier as in the SQL grammar instead of name (atoms, anyway).
+- [+] Welformedness of identifiers (atoms) checked before SQL generation.
+
 ## v0.4.10
 
 - [+] Function call in FROM clause
