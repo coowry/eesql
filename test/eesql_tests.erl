@@ -171,7 +171,7 @@ select_gt_test() ->
 select_function_test() ->
   {Select_AST, Params} = eesql:to_sql(#select{
                                          from = [users],
-                                         where= {created, '>', {<<"POWER">>, [1459286860,1]}}
+                                         where= {created, '>', {'POWER', [1459286860,1]}}
                                         }),
   ?assertEqual([1459286860,1], Params),
   ?assertEqual("SELECT ALL * FROM users WHERE created > POWER($1, $2);",
@@ -347,7 +347,7 @@ select_from_function_call_more_args_test() ->
 
 select_from_function_call_fun_argument_test() ->
   Function  = #pg_call{name = products,
-                       args = [{<<"country">>, [<<"ES">>]}]},
+                       args = [{country, [<<"ES">>]}]},
   {Select_AST, Params} = eesql:to_sql(#select{from = [Function]}),
   ?assertEqual([<<"ES">>], Params),
   ?assertEqual("SELECT ALL * FROM products(country($1));",

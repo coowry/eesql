@@ -8,10 +8,12 @@
 %% @doc SQL Abstract Syntax Tree.
 %%
 %% Reference material:
-%% - https://ronsavage.github.io/SQL/ (https://ronsavage.github.io/SQL/sql-2003-2.bnf.html)
-%% - Module epgsql.erl
-%% - http://www.postgresql.org/docs/current/static/sql.html
-%% - http://ns.inria.fr/ast/sql/index.html
+%% - USING: https://ronsavage.github.io/SQL/ (https://ronsavage.github.io/SQL/sql-2003-2.bnf.html)
+%% - As a reference: Module epgsql.erl
+%% - As a reference: http://www.postgresql.org/docs/current/static/sql.html
+%% - As a reference: https://docs.jboss.org/author/display/teiid81final/BNF+for+SQL+Grammar
+%% - As a reference: http://ns.inria.fr/ast/sql/index.html
+%% - To be reviewed: https://jakewheat.github.io/sql-overview/sql-2011-foundation-grammar.html
 -module(eesql).
 
 -include("include/eesql.hrl").
@@ -22,6 +24,7 @@
    [
     commit_stmt/0,
     column_name/0,
+    column_reference/0,
     delete_stmt/0,
     derived_column/0,
     from_clause/0,
@@ -55,7 +58,8 @@
 
 %% TODO: convert to non terminal symbols from https://ronsavage.github.io/SQL/sql-2003-2.bnf.html
 -export_type(
-   [name/0,
+   [id/0,
+    identifier_chain/0,
     predicate/0,
     binop/0]).
 
@@ -79,8 +83,18 @@
       | union_stmt()
       | pg_with_as().
 
-%% Any name (column name, table name, alias, ...)
--type name() :: atom().
+%% <identfier> ::= <actual identifier>
+%% <actual identifier> ::= <regular identifier> | <delimited identifier>
+%% <regular identifier> ::= <identifier body>
+%% <identifier body> ::= <identifier start> [ <identifier part> ... ]
+%% <identifier part> ::= <identifier start> | <identifier extend>
+%% <delimited identifier> ::= <double quote> <delimited identifier body> <double quote>
+%% <delimited identifier body> ::= <delimited identifier part> ...
+%% <delimited identifier part> ::= <nondoublequote character> | <doublequote symbol>
+-type id() :: atom().
+
+%% <identifier chain> ::= <identifier> [ { <period> <identifier> }... ]
+-type identifier_chain() :: atom().
 
 %% <literal> (any SQL literal, for the moment just inspired by epgsql:bind_param())
 %% <literal> ::= <signed numeric literal> | <general literal>
@@ -107,10 +121,13 @@
       .
 
 %% <table name>
--type table_name() :: name().
+-type table_name() :: identifier_chain().
+
+%% <column reference>
+-type column_reference() :: identifier_chain().
 
 %% <column name>
--type column_name() :: name().
+-type column_name() :: id().
 
 %% <row value expression>
 -type row_value_expr() :: nonempty_list(literal()).
@@ -118,19 +135,19 @@
 %% <derived column>
 -type derived_column() ::
         value_expr()
-      | {value_expr(), column_name()} %% AS
+      | {value_expr(), column_reference()} %% AS
         %% TODO: Improve type
-      | {count, column_name() | all}
-      | {count, {distinct, column_name()}}.
+      | {count, column_reference() | all}
+      | {count, {distinct, column_reference()}}.
 
 %% Expressions for describing "tables" (eg. FROM in a SELECT statement)
 -type table_ref() :: table_primary()
                    | joined_table()
-                   | {query_spec(), name()}
+                   | {query_spec(), id()}
                    | pg_call().
 
--type table_primary() :: name()
-                       | {name(), name()}. %% AS
+-type table_primary() :: id()
+                       | {id(), id()}. %% AS
 
 -type joined_table() :: qualified_join().
 
@@ -150,7 +167,7 @@
       | {'and', [predicate()]}
       | {'or', [predicate()]}
       | {value_expr(), binop(), value_expr()}
-      | {is_null, column_name()}
+      | {is_null, column_reference()}
       | {exists, query_spec()}
       | {between, value_expr(), value_expr(), value_expr()}
       | {in, value_expr(), query_spec()}.
@@ -193,13 +210,13 @@
 %% | <routine invocation>
 %% | <next value expression>
 -type value_expr() ::
-        column_name() %% <column reference>
-      | {function_name(), [value_expr()]} %% Represents function calls (a lot of clauses such us <fold>, <trim>, <natural logarithm>, ...
+        identifier_chain() %% <column reference>
+      | {routine_invocation(), [value_expr()]} %% Represents function calls (a lot of clauses such us <fold>, <trim>, <natural logarithm>, ...
       | [value_expr()] % Array (maybe nested)
       | literal().
 
 %% Supported function names
--type function_name() :: binary(). %% Function names such as UPPER, LOWER, POWER, ABS...
+-type routine_invocation() :: identifier_chain(). %% Function names such as UPPER, LOWER, POWER, ABS...
 
 %% Binary operators
 -type binop() :: '=' | '!=' | '<' | '>' | '<=' | '>=' | like.
@@ -231,7 +248,7 @@
 -type update_stmt() :: #update{}.
 
 %% <set clause>
--type set_clause() :: {column_name(), value_expr()}.
+-type set_clause() :: {column_reference(), value_expr()}.
 
 %% DELETE <delete statement: searched>
 -type delete_stmt() :: #delete{}.
@@ -279,7 +296,9 @@ to_sql(Statement) ->
              | {table_ref, table_ref()}
              | {literal, literal()}
              | {offset, undefined | {pos_integer(), pos_integer()}}
-             | {on_conflict_update_target, undefined | [column_name()], [column_name()]})
+             | {on_conflict_update_target, undefined | [column_reference()], [column_reference()]}
+             | {identifier, id()}
+             | {identifier_chain, identifier_chain()})
             -> {Pos, {Equery, Params}}
             when Pos :: pos_integer(),
                  Equery :: iodata(),
@@ -477,12 +496,16 @@ to_sql(P0, {join, #join{type = Type,
          Pred_SQL], 
         Pred_Parameters}};
 to_sql(P0, {table_ref, {Table_Name, Correlation_Name}}) ->
-  {P0, {[atom_to_binary(Table_Name, utf8),$ ,
-         "AS",$ ,
-         atom_to_binary(Correlation_Name, utf8)], 
-        []}};
+  {P1, {Table, Table_Params}} = to_sql(P0, {identifier_chain, Table_Name}),
+  {P2, {Correlation, Correlation_Params}} = to_sql(P1, {identifier, Correlation_Name}),
+  {P2, {[Table, $ ,
+        "AS", $ , Correlation], Table_Params ++ Correlation_Params}};
 to_sql(P0, {table_ref, Table_Name}) ->
-  {P0, {atom_to_binary(Table_Name, utf8), []}};
+  to_sql(P0, {identifier, Table_Name});
+to_sql(P0, {identifier, Id}) ->
+  %% TODO: Check if Identifier is wellformed
+  Identifier = atom_to_binary(Id, utf8),
+  {P0, {Identifier, []}};
 %% Serialize <where clause>
 to_sql(P0, {where_clause, undefined}) ->
   {P0, {"", []}};
@@ -607,12 +630,16 @@ to_sql(P0, {value_expr, Column}) when is_atom(Column),
                                       Column /= null,
                                       Column /= true,
                                       Column /= false ->
-  {P0, {name_to_sql(Column), []}};
-to_sql(P0, {value_expr, {Function_Name, Actual_Args}})
-  when is_binary(Function_Name) ->
+  to_sql(P0, {identifier_chain, Column});
+to_sql(P0, {identifier_chain, Id}) ->
+  %% TODO: Check identifier chain is wellformed
+  Identifier_Chain = atom_to_binary(Id, utf8),
+  {P0, {Identifier_Chain, []}};
+to_sql(P0, {value_expr, {Function_Name, Actual_Args}}) ->
+  Routine_Name = atom_to_binary(Function_Name, utf8),
   {P1, {Args_SQLs, Args_Params}} = 
     to_sql_fold(P0, value_expr, Actual_Args),
-  {P1, {[Function_Name, "(", intersperse(Args_SQLs, ", "), ")"], Args_Params}};
+  {P1, {[Routine_Name, "(", intersperse(Args_SQLs, ", "), ")"], Args_Params}};
 to_sql(P0, {value_expr, Value_Exprs}) when is_list(Value_Exprs) ->
   {P1, {Values_SQLs, Values_Params}} = 
     to_sql_fold(P0, value_expr, Value_Exprs),
@@ -662,11 +689,21 @@ derived_col_to_sql({Column, Alias}) ->
   [name_to_sql(Column), " AS ", name_to_sql(Alias)].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% @doc Serialize a name
--spec name_to_sql(name()) -> iodata().
+%% @doc Serialize an identifier
+-spec name_to_sql(identifier_chain() | id()) -> iodata().
 name_to_sql(Name) ->
-  atom_to_binary(Name, utf8).
-
+  Identifier = atom_to_binary(Name, utf8),
+  %% Regex = "^[a-zA-Z][a-zA-Z0-9_]*[\.a-zA-Z0-9_]*$|^[a-zA-Z][a-zA-Z0-9_]*$|^\"[a-zA-Z][a-zA-Z0-9_]*\"$",
+  %% {ok, MP} = re:compile(Regex),
+  %% case re:run(Identifier, MP) of
+  %%   {match, [{0,0}]} ->
+  %%     throw(non_valid_identifier);
+  %%   {match, _Captured} ->
+  %%     Identifier;
+  %%   nomatch ->
+  %%     throw(non_valid_identifier)
+  %% end.
+  Identifier.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Returns placeholder according to position
 -spec get_placeholder(Position :: integer()) -> string().
