@@ -12,8 +12,10 @@
 
 ## Next release
 
+## v0.4.11
+
 - [T] Refactor: using identifier as in the SQL grammar instead of name (atoms, anyway).
-- [+] Welformedness of identifiers (atoms) checked before SQL generation.
+- [+] Welformedness of identifiers (atoms) checked before SQL generation. (TODO)
 
 ## v0.4.10
 
