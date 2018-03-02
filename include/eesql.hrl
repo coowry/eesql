@@ -17,7 +17,7 @@
      %% <table expression> from here
      from :: eesql:from_clause(), %% (FROM) Source of data, table names for the moment (<from clause>)
      where :: eesql:predicate() | undefined, %% (WHERE) search condition (<where clause>)
-     group_by = [] :: list(eesql:column_name()), %% TODO: Group by expression
+     group_by = [] :: list(eesql:column_reference()), %% TODO: Group by expression
      order_by = [] :: list(eesql:sort_spec()), %% (ORDER BY) Sort specification (<sort specification list>)
      offset :: {non_neg_integer(), non_neg_integer()} | undefined, %% (OFFSET/FETCH)
      for_update = false :: boolean() %% Decides if a select is done for update or not
@@ -86,13 +86,13 @@
 -record(
    pg_with,
    {
-     definitions :: [{eesql:name(), eesql:query_spec()}],
+     definitions :: [{eesql:id(), eesql:query_spec()}],
      select :: eesql:query_spec()
    }).
 
 -record(
    pg_call,                                     % FUNCTION CALL in FROM CLAUSE
    {
-     name :: eesql:name(),
+     name :: eesql:id(),
      args :: list(eesql:value_expr())
    }).
