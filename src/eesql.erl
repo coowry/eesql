@@ -135,7 +135,7 @@
 %% <derived column>
 -type derived_column() ::
         value_expr()
-      | {value_expr(), column_reference()} %% AS
+      | {value_expr(), column_name()} %% AS
         %% TODO: Improve type
       | {count, column_reference() | all}
       | {count, {distinct, column_reference()}}.
