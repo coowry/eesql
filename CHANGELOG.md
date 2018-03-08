@@ -12,6 +12,10 @@
 
 ## Next release
 
+## v0.4.12
+
+- [F] Fix in derived_column type and a new test for SELECT statement
+
 ## v0.4.11
 
 - [T] Refactor: using identifier as in the SQL grammar instead of name (atoms, anyway).
