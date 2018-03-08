@@ -27,6 +27,14 @@ select_join_test() ->
   ?assertEqual("SELECT ALL users.name, emails.address FROM users INNER JOIN emails ON users.id = emails.id;",
                lists:flatten(io_lib:format("~s",[Select_AST]))).
 
+select_column_as_alias_test() ->
+  {Select_AST, Params} = eesql:to_sql(#select{columns = [{'users.name', name},
+                                                         {'users.email', email}],
+                                              from = [users]}),
+  ?assertEqual([], Params),
+  ?assertEqual("SELECT ALL users.name AS name, users.email AS email FROM users;",
+               lists:flatten(io_lib:format("~s", [Select_AST]))).
+
 select_join2_test() ->
   {Select_AST, Params} = eesql:to_sql(#select{
                                          columns = ['sim.id','users.name'],
