@@ -219,7 +219,7 @@
 -type routine_invocation() :: identifier_chain(). %% Function names such as UPPER, LOWER, POWER, ABS...
 
 %% Binary operators
--type binop() :: '=' | '!=' | '<' | '>' | '<=' | '>=' | like.
+-type binop() :: '=' | '!=' | '<>' | '<' | '>' | '<=' | '>=' | like.
 
 %% COMMIT <commit stmt>
 -type commit_stmt() :: commit | commit_and_chain | commit_and_no_chain.
