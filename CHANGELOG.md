@@ -12,6 +12,8 @@
 
 ## Next release
 
+- [+] New AST structure for representing joins (first iteration).
+
 ## v0.4.13
 
 - [F] Bug fixed: no parameters inspected when a table is an expression in a join.
