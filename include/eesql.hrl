@@ -66,7 +66,7 @@
 -record(
    qualified_join,
    {
-     type :: eesql:join_type(),
+     type = inner :: eesql:join_type(),
      left :: eesql:table_ref(),
      right :: eesql:table_ref(),
      on :: eesql:predicate()
