@@ -498,29 +498,36 @@ to_sql(P0, {join, #join{type = Type,
 to_sql(P0, {table_ref, #cross_join{left = Left, right = Right}}) ->
   {P1, {Left_Clause, Left_Params}} = to_sql(P0, {table_ref, Left}),
   {P2, {Right_Clause, Right_Params}} = to_sql(P1, {table_primary, Right}),
-  {P2, {[Left_Clause, $ ,
+  {P2, {["(",
+         Left_Clause, $ ,
          "CROSS JOIN", $ ,
-         Right_Clause],
+         Right_Clause,
+         ")"],
         Left_Params ++ Right_Params}};
 to_sql(P0, {table_ref, #natural_join{left = Left, right = Right}}) ->
   {P1, {Left_Clause, Left_Params}} = to_sql(P0, {table_ref, Left}),
   {P2, {Right_Clause, Right_Params}} = to_sql(P1, {table_primary, Right}),
-  {P2, {[Left_Clause, $ ,
+  {P2, {["(",
+         Left_Clause, $ ,
          "NATURAL JOIN", $ ,
-         Right_Clause],
+         Right_Clause,
+         ")"],
         Left_Params ++ Right_Params}};
 to_sql(P0, {table_ref, #union_join{left = Left, right = Right}}) ->
   {P1, {Left_Clause, Left_Params}} = to_sql(P0, {table_ref, Left}),
   {P2, {Right_Clause, Right_Params}} = to_sql(P1, {table_primary, Right}),
-  {P2, {[Left_Clause, $ ,
+  {P2, {["(",
+         Left_Clause, $ ,
          "UNION JOIN", $ ,
-         Right_Clause],
+         Right_Clause,
+         ")"],
         Left_Params ++ Right_Params}};
 to_sql(P0, {table_ref, #qualified_join{type = Type, left = Left, right = Right, on = On}}) ->
   {P1, {Left_Clause, Left_Params}} = to_sql(P0, {table_ref, Left}),
   {P2, {Right_Clause, Right_Params}} = to_sql(P1, {table_ref, Right}),
   {P3, {On_Clause, On_Params}} = to_sql(P2, {predicate, On}),
-  {P3, {[Left_Clause, $ ,
+  {P3, {["(",
+         Left_Clause, $ ,
          case Type of
            inner -> "INNER";
            left -> "LEFT OUTER";
@@ -530,7 +537,9 @@ to_sql(P0, {table_ref, #qualified_join{type = Type, left = Left, right = Right, 
          "JOIN", $ ,
          Right_Clause, $ ,
          "ON", $ ,
-         On_Clause],
+         On_Clause,
+         ")"
+        ],
         Left_Params ++ Right_Params ++ On_Params}};
 to_sql(P0, {table_ref, Table_Primary}) ->
   to_sql(P0, {table_primary, Table_Primary});
