@@ -84,7 +84,29 @@ select_cross_join_test() ->
                                                    }]
                                         }),
   ?assertEqual([], Params),
-  ?assertEqual("SELECT ALL * FROM countries CROSS JOIN languages;",
+  ?assertEqual("SELECT ALL * FROM (countries CROSS JOIN languages);",
+               lists:flatten(io_lib:format("~s",[Select_AST]))).
+
+select_natural_join_test() ->
+  {Select_AST, Params} = eesql:to_sql(#select{
+                                         from = [#natural_join{
+                                                    left = countries,
+                                                    right = languages
+                                                   }]
+                                        }),
+  ?assertEqual([], Params),
+  ?assertEqual("SELECT ALL * FROM (countries NATURAL JOIN languages);",
+               lists:flatten(io_lib:format("~s",[Select_AST]))).
+
+select_union_join_test() ->
+  {Select_AST, Params} = eesql:to_sql(#select{
+                                         from = [#union_join{
+                                                    left = countries,
+                                                    right = languages
+                                                   }]
+                                        }),
+  ?assertEqual([], Params),
+  ?assertEqual("SELECT ALL * FROM (countries UNION JOIN languages);",
                lists:flatten(io_lib:format("~s",[Select_AST]))).
 
 select_rightjoin_test() ->
@@ -104,9 +126,9 @@ select_rightjoin_test() ->
                                          where = {'not', {is_null,'sim.secret'}}}),
   ?assertEqual([<<"op-00c9">>], Params),
   ?assertEqual("SELECT ALL sim.id, users.name "
-               "FROM (SELECT ALL * FROM sims WHERE sims.operator = $1) AS sim "
-               "LEFT OUTER JOIN sim_owners ON sim_owners.id = sim.id "
-               "RIGHT OUTER JOIN users ON users.id = sim_owners.owner_id "
+               "FROM (((SELECT ALL * FROM sims WHERE sims.operator = $1) AS sim "
+               "LEFT OUTER JOIN sim_owners ON sim_owners.id = sim.id) "
+               "RIGHT OUTER JOIN users ON users.id = sim_owners.owner_id) "
                "WHERE NOT (sim.secret IS NULL);",
                lists:flatten(io_lib:format("~s",[Select_AST]))).
 
@@ -127,7 +149,7 @@ select_rightjoin2_test() ->
                                                     on = {'users.id','=','sim_owners.owner_id'}}],
                                          where = {'not', {is_null,'users.secret'}}}),
   ?assertEqual([<<"op-00c9">>], Params),
-  ?assertEqual("SELECT ALL sim.id, users.name FROM users RIGHT OUTER JOIN ((SELECT ALL * FROM sims WHERE sims.operator = $1) AS sim LEFT OUTER JOIN sim_owners ON sim_owners.id = sim.id) ON users.id = sim_owners.owner_id WHERE NOT (users.secret IS NULL);",
+  ?assertEqual("SELECT ALL sim.id, users.name FROM (users RIGHT OUTER JOIN ((SELECT ALL * FROM sims WHERE sims.operator = $1) AS sim LEFT OUTER JOIN sim_owners ON sim_owners.id = sim.id) ON users.id = sim_owners.owner_id) WHERE NOT (users.secret IS NULL);",
                lists:flatten(io_lib:format("~s",[Select_AST]))).
 
 select_leftjoin_test() ->
@@ -147,9 +169,9 @@ select_leftjoin_test() ->
                                          where = {'not', {is_null,'sim.secret'}}}),
   ?assertEqual([<<"op-00c9">>], Params),
   ?assertEqual("SELECT ALL sim.id, users.name "
-               "FROM (SELECT ALL * FROM sims WHERE sims.operator = $1) AS sim "
-               "LEFT OUTER JOIN sim_owners ON sim_owners.id = sim.id "
-               "LEFT OUTER JOIN users ON users.id = sim_owners.owner_id "
+               "FROM (((SELECT ALL * FROM sims WHERE sims.operator = $1) AS sim "
+               "LEFT OUTER JOIN sim_owners ON sim_owners.id = sim.id) "
+               "LEFT OUTER JOIN users ON users.id = sim_owners.owner_id) "
                "WHERE NOT (sim.secret IS NULL);",
                lists:flatten(io_lib:format("~s",[Select_AST]))).
 
