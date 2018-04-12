@@ -12,6 +12,8 @@
 
 ## Next release
 
+## v0.4.14
+
 - [+] New AST structure for representing joins (first iteration).
 
 ## v0.4.13
