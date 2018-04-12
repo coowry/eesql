@@ -473,16 +473,17 @@ to_sql(P0, {table_ref, #pg_call{name = Name,
 to_sql(P0, {table_ref, #join{type = no_join,
                              table = Table,
                              joins = Joins}}) ->
-  {P1, {Table_Clauses, _Params}} = to_sql(P0, {table_ref, Table}),
+  {P1, {Table_Clauses, Table_Params}} =
+    to_sql(P0, {table_ref, Table}),
   {P2, {Joins_Clauses, Joins_Params}} = 
     to_sql_fold(P1, join, Joins),
   {P2, {[Table_Clauses, $ ,
          intersperse(Joins_Clauses, " ")],
-        Joins_Params}};
+        Table_Params ++ Joins_Params}};
 to_sql(P0, {join, #join{type = Type,
                         table = Table,
                         spec = Spec}}) ->
-  {P1, {Table_Clauses, _Params}} = to_sql(P0, {table_ref, Table}),
+  {P1, {Table_Clauses, Table_Params}} = to_sql(P0, {table_ref, Table}),
   {P2, {Pred_SQL, Pred_Parameters}} = to_sql(P1, {predicate, Spec}),
   {P2, {[case Type of
            inner -> "INNER";
@@ -494,7 +495,7 @@ to_sql(P0, {join, #join{type = Type,
          Table_Clauses,$ ,
          "ON",$ ,
          Pred_SQL], 
-        Pred_Parameters}};
+        Table_Params ++ Pred_Parameters}};
 to_sql(P0, {table_ref, {Table_Name, Correlation_Name}}) ->
   {P1, {Table, Table_Params}} = to_sql(P0, {identifier_chain, Table_Name}),
   {P2, {Correlation, Correlation_Params}} = to_sql(P1, {identifier, Correlation_Name}),

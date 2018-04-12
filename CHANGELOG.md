@@ -12,6 +12,8 @@
 
 ## Next release
 
+- [F] Bug fixed: no parameters inspected when a table is an expression in a join.
+
 ## v0.4.12
 
 - [F] Fix in derived_column type and a new test for SELECT statement
