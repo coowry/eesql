@@ -12,6 +12,8 @@
 
 ## Next release
 
+## v0.4.13
+
 - [F] Bug fixed: no parameters inspected when a table is an expression in a join.
 
 ## v0.4.12
