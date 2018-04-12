@@ -140,22 +140,33 @@
       | {count, column_reference() | all}
       | {count, {distinct, column_reference()}}.
 
+%% <table reference>
 %% Expressions for describing "tables" (eg. FROM in a SELECT statement)
 -type table_ref() :: table_primary()
-                   | joined_table()
-                   | {query_spec(), id()}
-                   | pg_call().
+                   | joined_table().
 
+%% <table primary>
 -type table_primary() :: id()
-                       | {id(), id()}. %% AS
+                       | {id(), id()} %% AS
+                       | {query_spec(), id()}
+                       | pg_call()
+                       | {pg_call(), id}.
 
--type joined_table() :: qualified_join().
+%% <joined table>
+-type joined_table() :: cross_join()
+                      | qualified_join()
+                      | natural_join()
+                      | union_join().
 
--type qualified_join() :: #join{}.
+-type cross_join() :: #cross_join{}.
+
+-type qualified_join() :: #join{} | #qualified_join{}.
+
+-type natural_join() :: #natural_join{}.
+
+-type union_join() :: #union_join{}.
 
 -type join_type() :: inner | left | right | full.
-
--type join_condition() :: join_condition().
 
 %% <set quantifier>
 -type set_quant() :: all | distinct.
@@ -294,6 +305,7 @@ to_sql(Statement) ->
              | {value_expr, value_expr()}
              | {value_expr_list, [value_expr()]}
              | {table_ref, table_ref()}
+             | {table_primary, table_primary()}
              | {literal, literal()}
              | {offset, undefined | {pos_integer(), pos_integer()}}
              | {on_conflict_update_target, undefined | [column_reference()], [column_reference()]}
@@ -303,6 +315,7 @@ to_sql(Statement) ->
             when Pos :: pos_integer(),
                  Equery :: iodata(),
                  Params :: [literal()].
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Serialize SQL statement
 to_sql(Position, {sql_stmt, start_transaction}) ->
   {Position, {"BEGIN TRANSACTION", []}};
@@ -448,28 +461,14 @@ to_sql(P0, {sql_stmt, #pg_with{definitions = Definitions,
 	 intersperse(Query_Clause, ", "),
 	 " ",
 	 Select_Clause], Query_Params ++ Select_Params}};
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Serialize a list of <value expression>
 to_sql(P0, {value_expr_list, Row}) ->
   {P1, {Values_Clause, Values_Parameters}} = 
     to_sql_fold(P0, value_expr, Row),
   {P1, {["(", intersperse(Values_Clause, ", "), ")"], Values_Parameters}};
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Serialize <table reference>
-to_sql(P0, {table_ref, {#select{} = Select, Alias}}) ->
-  {P1, {Clauses, Params}} = to_sql(P0, {sql_stmt, Select}),
-  %% Remove semicolon from select sql to avoid syntax error
-  %% TODO: The select shouldn't have the semicolon, which sould be added
-  %% at the end of any query, since semicolon can only happen once and at the end.
-  Clauses_Without_Semicolon = lists:droplast(Clauses),
-  {P1, {["(",
-         Clauses_Without_Semicolon,
-         ") AS ",
-         atom_to_binary(Alias, utf8)], Params}};
-to_sql(P0, {table_ref, #pg_call{name = Name,
-                                args = Args}}) ->
-  {P1, {Args_Clauses, Args_Params}} = to_sql_fold(P0, value_expr, Args),
-  {P1, {[name_to_sql(Name),
-         "(",
-         intersperse(Args_Clauses, ", "),
-        ")"], Args_Params}};
 to_sql(P0, {table_ref, #join{type = no_join,
                              table = Table,
                              joins = Joins}}) ->
@@ -491,29 +490,98 @@ to_sql(P0, {join, #join{type = Type,
            right -> "RIGHT OUTER";
            full -> "FULL OUTER"
          end, $ ,
-         "JOIN ",
+         "JOIN", $ ,
          Table_Clauses,$ ,
          "ON",$ ,
          Pred_SQL], 
         Table_Params ++ Pred_Parameters}};
-to_sql(P0, {table_ref, {Table_Name, Correlation_Name}}) ->
+to_sql(P0, {table_ref, #cross_join{left = Left, right = Right}}) ->
+  {P1, {Left_Clause, Left_Params}} = to_sql(P0, {table_ref, Left}),
+  {P2, {Right_Clause, Right_Params}} = to_sql(P1, {table_primary, Right}),
+  {P2, {[Left_Clause, $ ,
+         "CROSS JOIN", $ ,
+         Right_Clause],
+        Left_Params ++ Right_Params}};
+to_sql(P0, {table_ref, #natural_join{left = Left, right = Right}}) ->
+  {P1, {Left_Clause, Left_Params}} = to_sql(P0, {table_ref, Left}),
+  {P2, {Right_Clause, Right_Params}} = to_sql(P1, {table_primary, Right}),
+  {P2, {[Left_Clause, $ ,
+         "NATURAL JOIN", $ ,
+         Right_Clause],
+        Left_Params ++ Right_Params}};
+to_sql(P0, {table_ref, #union_join{left = Left, right = Right}}) ->
+  {P1, {Left_Clause, Left_Params}} = to_sql(P0, {table_ref, Left}),
+  {P2, {Right_Clause, Right_Params}} = to_sql(P1, {table_primary, Right}),
+  {P2, {[Left_Clause, $ ,
+         "UNION JOIN", $ ,
+         Right_Clause],
+        Left_Params ++ Right_Params}};
+to_sql(P0, {table_ref, #qualified_join{type = Type, left = Left, right = Right, on = On}}) ->
+  {P1, {Left_Clause, Left_Params}} = to_sql(P0, {table_ref, Left}),
+  {P2, {Right_Clause, Right_Params}} = to_sql(P1, {table_ref, Right}),
+  {P3, {On_Clause, On_Params}} = to_sql(P2, {predicate, On}),
+  {P3, {[Left_Clause, $ ,
+         case Type of
+           inner -> "INNER";
+           left -> "LEFT OUTER";
+           right -> "RIGHT OUTER";
+           full -> "FULL OUTER"
+         end, $ ,
+         "JOIN", $ ,
+         Right_Clause, $ ,
+         "ON", $ ,
+         On_Clause],
+        Left_Params ++ Right_Params ++ On_Params}};
+to_sql(P0, {table_ref, Table_Primary}) ->
+  to_sql(P0, {table_primary, Table_Primary});
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Serialize <table primary>
+to_sql(P0, {table_primary, #pg_call{name = Name, args = Args}}) ->
+  {P1, {Args_Clauses, Args_Params}} = to_sql_fold(P0, value_expr, Args),
+  {P1, {[name_to_sql(Name),
+         "(",
+         intersperse(Args_Clauses, ", "),
+         ")"], Args_Params}};
+to_sql(P0, {table_primary, {#pg_call{} = Call, Correlation_Name}}) ->
+  {P1, {Call_Clause, Call_Params}} = to_sql(P0, {table_primary, Call}),
+  {P2, {Correlation, Correlation_Params}} = to_sql(P1, {identifier, Correlation_Name}),
+  {P2, {[Call_Clause, $ ,
+         "AS", $ ,
+         Correlation], Call_Params ++ Correlation_Params}};
+to_sql(P0, {table_primary, {#select{} = Select, Correlation_Name}}) ->
+  {P1, {Clauses, Select_Params}} = to_sql(P0, {sql_stmt, Select}),
+  {P2, {Correlation, Correlation_Params}} = to_sql(P1, {identifier, Correlation_Name}),
+  %% Remove semicolon from select sql to avoid syntax error
+  %% TODO: The select shouldn't have the semicolon, which sould be added
+  %% at the end of any query, since semicolon can only happen once and at the end.
+  Clauses_Without_Semicolon = lists:droplast(Clauses),
+  {P2, {["(",
+         Clauses_Without_Semicolon,
+         ")", $ ,
+         "AS", $ ,
+         Correlation], Select_Params ++ Correlation_Params}};
+to_sql(P0, {table_primary, {Table_Name, Correlation_Name}}) ->
   {P1, {Table, Table_Params}} = to_sql(P0, {identifier_chain, Table_Name}),
   {P2, {Correlation, Correlation_Params}} = to_sql(P1, {identifier, Correlation_Name}),
   {P2, {[Table, $ ,
         "AS", $ , Correlation], Table_Params ++ Correlation_Params}};
-to_sql(P0, {table_ref, Table_Name}) ->
+to_sql(P0, {table_primary, Table_Name}) ->
   to_sql(P0, {identifier, Table_Name});
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Serialize <identifier>
 to_sql(P0, {identifier, Id}) ->
   %% TODO: Check if Identifier is wellformed
   Identifier = atom_to_binary(Id, utf8),
   {P0, {Identifier, []}};
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Serialize <where clause>
 to_sql(P0, {where_clause, undefined}) ->
   {P0, {"", []}};
 to_sql(P0, {where_clause, Predicate}) ->
   {P1, {Pred_SQL, Pred_Params}} = to_sql(P0, {predicate, Predicate}),
   {P1, {[" WHERE ", Pred_SQL], Pred_Params}};
-%% Serialize <sort_spec>
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Serialize a sort specification (<window clause>)
 to_sql(P0, {sort_spec, {Value, Order, Nulls}}) ->
   {P1, {Value_SQL, Value_Params}} = to_sql(P0, {value_expr, Value}),
   {P1, {[Value_SQL, " ",
@@ -535,7 +603,8 @@ to_sql(P0, {sort_spec, {Value, last}}) ->
   {P1, {[Value_SQL, " NULLS LAST"], Value_Params}};
 to_sql(P0, {sort_spec, Value}) ->
   to_sql(P0, {value_expr, Value});
-%% Serialize offset/fetch
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Serialize offset/fetch (<window clause>)
 to_sql(P0, {offset, undefined}) ->
   {P0, {"", []}};
 to_sql(P0, {offset, {Start, Count}}) ->
@@ -550,6 +619,7 @@ to_sql(P0, {offset, {Value, Order, Nulls}}) ->
          " NULLS ",
          case Nulls of last -> "LAST"; first -> "FIRST" end],
        Value_Params}};
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Serialize on conflict
 to_sql(P0, {on_conflict_update_target, undefined, _}) ->
   {P0, {"", []}};
@@ -569,6 +639,7 @@ to_sql(P0, {on_conflict_update_target, Conflict_Columns, Columns}) ->
          " DO UPDATE SET ", 
          intersperse(Set_Clauses, ", ")],
         []}};
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Serialize <predicate>
 to_sql(P0, {predicate, true}) ->
   {P0, {"TRUE", []}};
@@ -626,16 +697,13 @@ to_sql(P0, {predicate, {in, Expr, Select = #select{}}}) ->
   %% Remove semicolon from select sql to avoid syntax error
   Select_SQL_Without_Semicolon = lists:droplast(Select_SQL),
   {P2, {[Expr_SQL, " IN (", Select_SQL_Without_Semicolon, ")"], Expr_Params ++ Select_Params}};
-%% Serialize a value expression
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Serialize a <value expression>
 to_sql(P0, {value_expr, Column}) when is_atom(Column),
                                       Column /= null,
                                       Column /= true,
                                       Column /= false ->
   to_sql(P0, {identifier_chain, Column});
-to_sql(P0, {identifier_chain, Id}) ->
-  %% TODO: Check identifier chain is wellformed
-  Identifier_Chain = atom_to_binary(Id, utf8),
-  {P0, {Identifier_Chain, []}};
 to_sql(P0, {value_expr, {Function_Name, Actual_Args}}) ->
   Routine_Name = atom_to_binary(Function_Name, utf8),
   {P1, {Args_SQLs, Args_Params}} = 
@@ -647,7 +715,14 @@ to_sql(P0, {value_expr, Value_Exprs}) when is_list(Value_Exprs) ->
   {P1, {["{", intersperse(Values_SQLs, ", "), "}"], Values_Params}};
 to_sql(P0, {value_expr, Literal}) ->
   to_sql(P0, {literal, Literal});
-%% Serialize a literal
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Serialize a <identifier chain>
+to_sql(P0, {identifier_chain, Id}) ->
+  %% TODO: Check identifier chain is wellformed
+  Identifier_Chain = atom_to_binary(Id, utf8),
+  {P0, {Identifier_Chain, []}};
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Serialize a <literal>
 to_sql(P0, {literal, null}) ->
   {P0, {<<"NULL">>, []}};
 to_sql(P0, {literal, true}) ->
@@ -659,6 +734,7 @@ to_sql(P0, {literal, Value}) when is_binary(Value);
                                   is_float(Value) ->
   {P0+1, {get_placeholder(P0), [Value]}}.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Serialize a list of AST nodes
 to_sql_fold(P0, Node_Type, Nodes) ->
   lists:foldl(fun(Node, {PI, {Accum_SQL, Accum_Params}}) ->
@@ -671,12 +747,14 @@ to_sql_fold(P0, Node_Type, Nodes) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Serialize set quantifier
+%% @todo Integrate it in to_sql
 -spec set_quant_to_sql(set_quant()) -> iodata().
 set_quant_to_sql(all) -> "ALL";
 set_quant_to_sql(distinct) -> "DISTINCT".
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Serialize a derived column
+%% @todo Integrate it in to_sql
 -spec derived_col_to_sql(derived_column()) -> iodata().
 derived_col_to_sql(Column) when is_atom(Column) ->
   name_to_sql(Column);
@@ -691,6 +769,7 @@ derived_col_to_sql({Column, Alias}) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Serialize an identifier
+%% @todo Integrate it in to_sql
 -spec name_to_sql(identifier_chain() | id()) -> iodata().
 name_to_sql(Name) ->
   Identifier = atom_to_binary(Name, utf8),
@@ -705,6 +784,7 @@ name_to_sql(Name) ->
   %%     throw(non_valid_identifier)
   %% end.
   Identifier.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Returns placeholder according to position
 -spec get_placeholder(Position :: integer()) -> string().
