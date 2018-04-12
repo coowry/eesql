@@ -76,6 +76,105 @@ select_join3_test() ->
                "WHERE NOT (sim.secret IS NULL);",
                lists:flatten(io_lib:format("~s",[Select_AST]))).
 
+select_cross_join_test() ->
+  {Select_AST, Params} = eesql:to_sql(#select{
+                                         from = [#cross_join{
+                                                    left = countries,
+                                                    right = languages
+                                                   }]
+                                        }),
+  ?assertEqual([], Params),
+  ?assertEqual("SELECT ALL * FROM (countries CROSS JOIN languages);",
+               lists:flatten(io_lib:format("~s",[Select_AST]))).
+
+select_natural_join_test() ->
+  {Select_AST, Params} = eesql:to_sql(#select{
+                                         from = [#natural_join{
+                                                    left = countries,
+                                                    right = languages
+                                                   }]
+                                        }),
+  ?assertEqual([], Params),
+  ?assertEqual("SELECT ALL * FROM (countries NATURAL JOIN languages);",
+               lists:flatten(io_lib:format("~s",[Select_AST]))).
+
+select_union_join_test() ->
+  {Select_AST, Params} = eesql:to_sql(#select{
+                                         from = [#union_join{
+                                                    left = countries,
+                                                    right = languages
+                                                   }]
+                                        }),
+  ?assertEqual([], Params),
+  ?assertEqual("SELECT ALL * FROM (countries UNION JOIN languages);",
+               lists:flatten(io_lib:format("~s",[Select_AST]))).
+
+select_rightjoin_test() ->
+  {Select_AST, Params} = eesql:to_sql(#select{
+                                         columns = ['sim.id','users.name'],
+                                         from = [#qualified_join{
+                                                    type = right,
+                                                    left = #qualified_join{
+                                                              type = left,
+                                                              left = {#select{from=[sims],
+                                                                              where = {'sims.operator', '=', <<"op-00c9">>}},
+                                                                      sim},
+                                                              right = sim_owners,
+                                                              on = {'sim_owners.id','=','sim.id'}},
+                                                    right = users,
+                                                    on = {'users.id','=','sim_owners.owner_id'}}],
+                                         where = {'not', {is_null,'sim.secret'}}}),
+  ?assertEqual([<<"op-00c9">>], Params),
+  ?assertEqual("SELECT ALL sim.id, users.name "
+               "FROM (((SELECT ALL * FROM sims WHERE sims.operator = $1) AS sim "
+               "LEFT OUTER JOIN sim_owners ON sim_owners.id = sim.id) "
+               "RIGHT OUTER JOIN users ON users.id = sim_owners.owner_id) "
+               "WHERE NOT (sim.secret IS NULL);",
+               lists:flatten(io_lib:format("~s",[Select_AST]))).
+
+%% TODO (AH): this test fails, not clear what's the associativity and precedence of joins are.
+select_rightjoin2_test() ->
+  {Select_AST, Params} = eesql:to_sql(#select{
+                                         columns = ['sim.id','users.name'],
+                                         from = [#qualified_join{
+                                                    type = right,
+                                                    left = users,
+                                                    right = #qualified_join{
+                                                               type = left,
+                                                               left = {#select{from=[sims],
+                                                                               where = {'sims.operator', '=', <<"op-00c9">>}},
+                                                                       sim},
+                                                               right = sim_owners,
+                                                               on = {'sim_owners.id','=','sim.id'}},
+                                                    on = {'users.id','=','sim_owners.owner_id'}}],
+                                         where = {'not', {is_null,'users.secret'}}}),
+  ?assertEqual([<<"op-00c9">>], Params),
+  ?assertEqual("SELECT ALL sim.id, users.name FROM (users RIGHT OUTER JOIN ((SELECT ALL * FROM sims WHERE sims.operator = $1) AS sim LEFT OUTER JOIN sim_owners ON sim_owners.id = sim.id) ON users.id = sim_owners.owner_id) WHERE NOT (users.secret IS NULL);",
+               lists:flatten(io_lib:format("~s",[Select_AST]))).
+
+select_leftjoin_test() ->
+  {Select_AST, Params} = eesql:to_sql(#select{
+                                         columns = ['sim.id','users.name'],
+                                         from = [#qualified_join{
+                                                    type = left,
+                                                    left = #qualified_join{
+                                                              type = left,
+                                                              left = {#select{from=[sims],
+                                                                              where = {'sims.operator', '=', <<"op-00c9">>}},
+                                                                      sim},
+                                                              right = sim_owners,
+                                                              on = {'sim_owners.id','=','sim.id'}},
+                                                    right = users,
+                                                    on = {'users.id','=','sim_owners.owner_id'}}],
+                                         where = {'not', {is_null,'sim.secret'}}}),
+  ?assertEqual([<<"op-00c9">>], Params),
+  ?assertEqual("SELECT ALL sim.id, users.name "
+               "FROM (((SELECT ALL * FROM sims WHERE sims.operator = $1) AS sim "
+               "LEFT OUTER JOIN sim_owners ON sim_owners.id = sim.id) "
+               "LEFT OUTER JOIN users ON users.id = sim_owners.owner_id) "
+               "WHERE NOT (sim.secret IS NULL);",
+               lists:flatten(io_lib:format("~s",[Select_AST]))).
+
 select_theta_test() ->
   {Select_AST, Params} = eesql:to_sql(#select{
                                          columns=['users.name','emails.address'],
@@ -354,9 +453,9 @@ select_from_select_test() ->
 
 select_from_function_call_test() ->
   Function = #pg_call{name = total_balance , args = [<<"agid">>]},
-  {Select_AST, Params} = eesql:to_sql(#select{from = [Function]}),
+  {Select_AST, Params} = eesql:to_sql(#select{from = [{Function, balance}]}),
   ?assertEqual([<<"agid">>], Params),
-  ?assertEqual("SELECT ALL * FROM total_balance($1);",
+  ?assertEqual("SELECT ALL * FROM total_balance($1) AS balance;",
               lists:flatten(io_lib:format("~s", [Select_AST]))).
 
 select_from_function_call_no_args_test() ->
