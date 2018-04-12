@@ -1,6 +1,6 @@
 {application, eesql,
  [{description, "Erlang Embedded SQL library"},
-  {vsn, "0.4.12"},
+  {vsn, "0.4.13"},
   {registered, []},
   {applications,
    [kernel,
