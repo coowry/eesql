@@ -415,6 +415,12 @@ count_test() ->
   ?assertEqual("SELECT ALL COUNT(trades.id) FROM trades WHERE sort = $1;",
                lists:flatten(io_lib:format("~s",[Count_AST]))).
 
+count_literal_test() ->
+  {Count_AST, Params} = eesql:to_sql(#select{from = [trades], columns = [{count, 1}], where = {sort, '=', <<"p2p">>}}),
+  ?assertEqual([1,<<"p2p">>], Params),
+  ?assertEqual("SELECT ALL COUNT($1) FROM trades WHERE sort = $2;",
+               lists:flatten(io_lib:format("~s",[Count_AST]))).
+
 sum_test() ->
   {Sum_AST, Params} = eesql:to_sql(#select{from = [trades], columns = [{sum, ['trades.value']}], where = {sort, '=', <<"p2p">>}}),
   ?assertEqual([<<"p2p">>], Params),
