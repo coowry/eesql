@@ -12,6 +12,8 @@
 
 ## Next release
 
+- [+] AST structure improved for representing function calls in "derived columns" (FROM clause in SELECTs).
+
 ## v0.4.14
 
 - [+] New AST structure for representing joins (first iteration).
