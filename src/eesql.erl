@@ -120,13 +120,22 @@
       %% | {calendar:time(), Days::non_neg_integer(), Months::non_neg_integer()}
       .
 
-%% <table name>
+%% <table name> ::= <local or schema qualified name>
+%% <local or schema qualified name> ::= [ <local or schema qualifier> <period> ] <qualified identifier>
+%% <local or schema qualifier> ::= <schema name> | MODULE
+%% <schema name> ::= [ <catalog name> <period> ] <unqualified schema name>
+%% <unqualified schema name> ::= ???
+%% <catalog name> ::= <identifier>
 -type table_name() :: identifier_chain().
 
-%% <column reference>
+%% <column reference> ::=
+%%   <basic identifier chain>
+%% | MODULE <period> <qualified identifier> <period> <column name>
+%% <basic identifier chain> ::= <identifier chain>
+%% <qualified identifier> ::= <identifier>
 -type column_reference() :: identifier_chain().
 
-%% <column name>
+%% <column name> ::= <identifier>
 -type column_name() :: id().
 
 %% <row value expression>
