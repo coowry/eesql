@@ -543,3 +543,16 @@ with_as_test() ->
   ?assertEqual([<<"some_name">>], Params),
   ?assertEqual("WITH data_for_user AS (SELECT ALL username, name FROM users WHERE name = $1) SELECT ALL country, COUNT(*) FROM data_for_user GROUP BY country;",	       
 lists:flatten(io_lib:format("~s", [With_As_AST]))).
+
+identifier_test() ->
+  ?assertEqual(<<"user">>, eesql:identifier_to_sql(user)),
+  ?assertEqual(<<"user1">>, eesql:identifier_to_sql(user1)),
+  ?assertEqual(<<"_user">>, eesql:identifier_to_sql('_user')),
+  ?assertEqual(<<"user_">>, eesql:identifier_to_sql(user_)),
+  ?assertEqual(<<"us1er">>, eesql:identifier_to_sql(us1er)),
+  ?assertEqual(<<"\"user\"">>, eesql:identifier_to_sql('"user"')),
+  ?assertException(throw, {non_valid_identifier,'user.address'}, eesql:identifier_to_sql('user.address')),
+  ?assertEqual(<<"user.address">>, eesql:identifier_chain_to_sql('user.address')),
+  ?assertEqual(<<"\"user\".address">>, eesql:identifier_chain_to_sql('"user".address')),
+  ?assertEqual(<<"user.\"address\"">>, eesql:identifier_chain_to_sql('user."address"')),
+  ?assertException(throw, {non_valid_identifier,'user.'}, eesql:identifier_to_sql('user.')).
