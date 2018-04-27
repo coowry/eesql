@@ -137,8 +137,8 @@
         value_expr()
       | {value_expr(), column_name()} %% AS
         %% TODO: Improve type
-      | {count, column_reference() | all}
-      | {count, {distinct, column_reference()}}.
+      | {count, value_expr() | all}
+      | {count, {distinct, value_expr()}}.
 
 %% <table reference>
 %% Expressions for describing "tables" (eg. FROM in a SELECT statement)
