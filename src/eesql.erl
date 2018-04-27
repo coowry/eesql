@@ -371,44 +371,46 @@ to_sql(P0, {sql_stmt, #select{quantifier = Quant,
                               offset = Offset,
                               for_update = For_Update}}) ->
   Quant_SQL = set_quant_to_sql(Quant),
-  case Columns of
+  {P1, {Columns_SQL, Columns_Parameters}} = to_sql_fold(P0, derived_column, Columns),
+  case Columns_SQL of
     [] ->
       Items = "*";
     _ ->
-      Items = intersperse([derived_col_to_sql(Column) || Column <- Columns], ", ")
+      Items = intersperse(Columns_SQL, ", ")
   end,
-  {P1, {Table_Ref_Clauses, Table_Ref_Parameters}} = 
-    to_sql_fold(P0, table_ref, From),
-  {P2, {Where_Clause, Where_Parameters}} = to_sql(P1, {where_clause, Where}),
-  {P3, {Sort_Spec_Clauses, Sort_Specs_Parameters}} =
-    to_sql_fold(P2, sort_spec, Sort_Specs),
+  {P2, {Table_Ref_Clauses, Table_Ref_Parameters}} =
+    to_sql_fold(P1, table_ref, From),
+  {P3, {Where_Clause, Where_Parameters}} = to_sql(P2, {where_clause, Where}),
+  {P4, {Sort_Spec_Clauses, Sort_Specs_Parameters}} =
+    to_sql_fold(P3, sort_spec, Sort_Specs),
   %% TODO: Group By expression, not only a list of columns.
-  case Group_By of
+  {P5, {Group_By_Exprs_SQL, Group_By_Parameters}} = to_sql_fold(P4, derived_column, Group_By),
+  case Group_By_Exprs_SQL of
     [] ->
       Group_By_Clause = "";
     _ ->
-      Group_By_Clause = [" GROUP BY ", intersperse([derived_col_to_sql(Column) || Column <- Group_By], ", ")]
+      Group_By_Clause = [" GROUP BY ", intersperse(Group_By_Exprs_SQL, ", ")]
   end,
   Order_By_Clause =
     case Sort_Spec_Clauses of
       [] -> "";
       _ -> [" ORDER BY ", intersperse(Sort_Spec_Clauses, ", ")]
     end,
-  {P4, {Offset_Clause, Offset_Params}} = to_sql(P3, {offset, Offset}),
+  {P6, {Offset_Clause, Offset_Params}} = to_sql(P5, {offset, Offset}),
   case For_Update of
     false ->
       For_Update_Clause = "";
     true ->
       For_Update_Clause = " FOR UPDATE"
   end,
-  {P4, {["SELECT ", Quant_SQL, " ", Items,
+  {P6, {["SELECT ", Quant_SQL, " ", Items,
          [" FROM ", intersperse(Table_Ref_Clauses, ", ")],
          Where_Clause,
          Group_By_Clause,
          Order_By_Clause,
          Offset_Clause,
          For_Update_Clause],
-        Table_Ref_Parameters ++ Where_Parameters ++ Sort_Specs_Parameters ++ Offset_Params}};
+        Columns_Parameters ++ Table_Ref_Parameters ++ Where_Parameters ++ Group_By_Parameters ++ Sort_Specs_Parameters ++ Offset_Params}};
 to_sql(P0, {sql_stmt, #insert{table = Table, 
                               columns = Columns, 
                               values = Rows,
@@ -461,6 +463,20 @@ to_sql(P0, {sql_stmt, #pg_with{definitions = Definitions,
 	 intersperse(Query_Clause, ", "),
 	 " ",
 	 Select_Clause], Query_Params ++ Select_Params}};
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Serialize <derived column>
+to_sql(P0, {derived_column, {count, all}}) ->
+  {P0, {["COUNT(*)"],[]}};
+to_sql(P0, {derived_column, {count, {distinct, Column}}}) ->
+  {P0,{["COUNT(DISTINCT ", name_to_sql(Column), ")"], []}};
+to_sql(P0, {derived_column, {count, Column}}) ->
+  {P0,{["COUNT(", name_to_sql(Column), ")"], []}};
+to_sql(P0, {derived_column, {Column, Alias}}) when is_atom(Alias)->
+  {P1, {Value_Expr_SQL, Value_Expr_Parameters}} =
+    to_sql(P0, {value_expr, Column}),
+  {P1, {[Value_Expr_SQL, " AS ", name_to_sql(Alias)], Value_Expr_Parameters}};
+to_sql(P0, {derived_column, Column}) ->
+  to_sql(P0, {value_expr, Column});
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Serialize a list of <value expression>
 to_sql(P0, {value_expr_list, Row}) ->
@@ -760,21 +776,6 @@ to_sql_fold(P0, Node_Type, Nodes) ->
 -spec set_quant_to_sql(set_quant()) -> iodata().
 set_quant_to_sql(all) -> "ALL";
 set_quant_to_sql(distinct) -> "DISTINCT".
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% @doc Serialize a derived column
-%% @todo Integrate it in to_sql
--spec derived_col_to_sql(derived_column()) -> iodata().
-derived_col_to_sql(Column) when is_atom(Column) ->
-  name_to_sql(Column);
-derived_col_to_sql({count, all}) ->
-  ["COUNT(*)"];
-derived_col_to_sql({count, {distinct, Column}}) ->
-  ["COUNT(DISTINCT ", name_to_sql(Column), ")"];
-derived_col_to_sql({count, Column}) ->
-  ["COUNT(", name_to_sql(Column), ")"];
-derived_col_to_sql({Column, Alias}) ->
-  [name_to_sql(Column), " AS ", name_to_sql(Alias)].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Serialize an identifier
