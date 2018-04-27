@@ -468,9 +468,13 @@ to_sql(P0, {sql_stmt, #pg_with{definitions = Definitions,
 to_sql(P0, {derived_column, {count, all}}) ->
   {P0, {["COUNT(*)"],[]}};
 to_sql(P0, {derived_column, {count, {distinct, Column}}}) ->
-  {P0,{["COUNT(DISTINCT ", name_to_sql(Column), ")"], []}};
+  {P1, {Value_Expr_SQL, Value_Expr_Parameters}} =
+    to_sql(P0, {value_expr, Column}),
+  {P1,{["COUNT(DISTINCT ", Value_Expr_SQL, ")"], Value_Expr_Parameters}};
 to_sql(P0, {derived_column, {count, Column}}) ->
-  {P0,{["COUNT(", name_to_sql(Column), ")"], []}};
+  {P1, {Value_Expr_SQL, Value_Expr_Parameters}} =
+    to_sql(P0, {value_expr, Column}),
+  {P1,{["COUNT(", Value_Expr_SQL, ")"], Value_Expr_Parameters}};
 to_sql(P0, {derived_column, {Column, Alias}}) when is_atom(Alias)->
   {P1, {Value_Expr_SQL, Value_Expr_Parameters}} =
     to_sql(P0, {value_expr, Column}),
