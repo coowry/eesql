@@ -415,6 +415,24 @@ count_test() ->
   ?assertEqual("SELECT ALL COUNT(trades.id) FROM trades WHERE sort = $1;",
                lists:flatten(io_lib:format("~s",[Count_AST]))).
 
+count_literal_test() ->
+  {Count_AST, Params} = eesql:to_sql(#select{from = [trades], columns = [{count, 1}], where = {sort, '=', <<"p2p">>}}),
+  ?assertEqual([1,<<"p2p">>], Params),
+  ?assertEqual("SELECT ALL COUNT($1) FROM trades WHERE sort = $2;",
+               lists:flatten(io_lib:format("~s",[Count_AST]))).
+
+sum_test() ->
+  {Sum_AST, Params} = eesql:to_sql(#select{from = [trades], columns = [{sum, ['trades.value']}], where = {sort, '=', <<"p2p">>}}),
+  ?assertEqual([<<"p2p">>], Params),
+  ?assertEqual("SELECT ALL sum(trades.value) FROM trades WHERE sort = $1;",
+               lists:flatten(io_lib:format("~s",[Sum_AST]))).
+
+sum_as_test() ->
+  {Sum_AST, Params} = eesql:to_sql(#select{from = [trades], columns = [{{sum, ['trades.value']}, total_value}], where = {sort, '=', <<"p2p">>}}),
+  ?assertEqual([<<"p2p">>], Params),
+  ?assertEqual("SELECT ALL sum(trades.value) AS total_value FROM trades WHERE sort = $1;",
+               lists:flatten(io_lib:format("~s",[Sum_AST]))).
+
 distinct_count_test() ->
   {Count_AST, Params} = eesql:to_sql(#select{from = [trades], columns = [{count, {distinct, 'trades.sender'}}], where = {sort, '=', <<"p2p">>}}),
   ?assertEqual([<<"p2p">>], Params),
@@ -525,3 +543,16 @@ with_as_test() ->
   ?assertEqual([<<"some_name">>], Params),
   ?assertEqual("WITH data_for_user AS (SELECT ALL username, name FROM users WHERE name = $1) SELECT ALL country, COUNT(*) FROM data_for_user GROUP BY country;",	       
 lists:flatten(io_lib:format("~s", [With_As_AST]))).
+
+identifier_test() ->
+  ?assertEqual(<<"user">>, eesql:identifier_to_sql(user)),
+  ?assertEqual(<<"user1">>, eesql:identifier_to_sql(user1)),
+  ?assertEqual(<<"_user">>, eesql:identifier_to_sql('_user')),
+  ?assertEqual(<<"user_">>, eesql:identifier_to_sql(user_)),
+  ?assertEqual(<<"us1er">>, eesql:identifier_to_sql(us1er)),
+  ?assertEqual(<<"\"user\"">>, eesql:identifier_to_sql('"user"')),
+  ?assertException(throw, {non_valid_identifier,'user.address'}, eesql:identifier_to_sql('user.address')),
+  ?assertEqual(<<"user.address">>, eesql:identifier_chain_to_sql('user.address')),
+  ?assertEqual(<<"\"user\".address">>, eesql:identifier_chain_to_sql('"user".address')),
+  ?assertEqual(<<"user.\"address\"">>, eesql:identifier_chain_to_sql('user."address"')),
+  ?assertException(throw, {non_valid_identifier,'user.'}, eesql:identifier_to_sql('user.')).

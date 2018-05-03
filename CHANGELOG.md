@@ -12,6 +12,11 @@
 
 ## Next release
 
+## v0.4.15
+
+- [+] AST structure improved for representing function calls in "derived columns" (FROM clause in SELECTs).
+- [T] Protecting compilation of identifiers with proper regular expressions.
+
 ## v0.4.14
 
 - [+] New AST structure for representing joins (first iteration).

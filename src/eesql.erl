@@ -67,6 +67,21 @@
 -export([to_sql/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-export([identifier_to_sql/1,
+        identifier_chain_to_sql/1]).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Precompiled regular expressions for checking proper identifiers and
+%% identifier chains
+
+%% io:format("~w~n", [re:compile("^(\"[a-zA-Z0-9_]+\"|^[a-zA-Z0-9_]+)$")]).
+-define(IDENTIFIER_MP, {re_pattern,1,0,0,<<69,82,67,80,157,0,0,0,16,0,0,0,1,0,0,0,255,255,255,255,255,255,255,255,0,0,0,0,0,0,1,0,0,0,64,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,125,0,89,25,127,0,43,0,1,29,34,106,0,0,0,0,0,0,255,3,254,255,255,135,254,255,255,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100,29,34,113,0,38,25,106,0,0,0,0,0,0,255,3,254,255,255,135,254,255,255,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100,114,0,81,27,114,0,89,0>>}).
+
+%% io:format("~w~n", [re:compile("^(\"[a-zA-Z0-9_]+\"|[a-zA-Z0-9_]+)(\.(\"[a-zA-Z0-9_]+\"|[a-zA-Z0-9_]+))*$")]).
+-define(IDENTIFIER_CHAIN_MP, {re_pattern,3,0,0,<<69,82,67,80,249,0,0,0,16,0,0,0,1,0,0,0,255,255,255,255,255,255,255,255,0,0,0,0,0,0,3,0,0,0,64,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,125,0,181,25,127,0,43,0,1,29,34,106,0,0,0,0,0,0,255,3,254,255,255,135,254,255,255,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100,29,34,113,0,37,106,0,0,0,0,0,0,255,3,254,255,255,135,254,255,255,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100,114,0,80,140,127,0,89,0,2,12,127,0,43,0,3,29,34,106,0,0,0,0,0,0,255,3,254,255,255,135,254,255,255,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100,29,34,113,0,37,106,0,0,0,0,0,0,255,3,254,255,255,135,254,255,255,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100,114,0,80,115,0,89,27,114,0,181,0>>}).
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% The following types represents the PG SQL Abstract Syntax Tree.
 
 %% Key SQL statements and fragments
@@ -120,13 +135,22 @@
       %% | {calendar:time(), Days::non_neg_integer(), Months::non_neg_integer()}
       .
 
-%% <table name>
+%% <table name> ::= <local or schema qualified name>
+%% <local or schema qualified name> ::= [ <local or schema qualifier> <period> ] <qualified identifier>
+%% <local or schema qualifier> ::= <schema name> | MODULE
+%% <schema name> ::= [ <catalog name> <period> ] <unqualified schema name>
+%% <unqualified schema name> ::= ???
+%% <catalog name> ::= <identifier>
 -type table_name() :: identifier_chain().
 
-%% <column reference>
+%% <column reference> ::=
+%%   <basic identifier chain>
+%% | MODULE <period> <qualified identifier> <period> <column name>
+%% <basic identifier chain> ::= <identifier chain>
+%% <qualified identifier> ::= <identifier>
 -type column_reference() :: identifier_chain().
 
-%% <column name>
+%% <column name> ::= <identifier>
 -type column_name() :: id().
 
 %% <row value expression>
@@ -137,8 +161,8 @@
         value_expr()
       | {value_expr(), column_name()} %% AS
         %% TODO: Improve type
-      | {count, column_reference() | all}
-      | {count, {distinct, column_reference()}}.
+      | {count, value_expr() | all}
+      | {count, {distinct, value_expr()}}.
 
 %% <table reference>
 %% Expressions for describing "tables" (eg. FROM in a SELECT statement)
@@ -328,13 +352,13 @@ to_sql(Position, {sql_stmt, commit_and_no_chain}) ->
 to_sql(Position, {sql_stmt, rollback}) ->
   {Position, {"ROLLBACK", []}};
 to_sql(Position, {sql_stmt, #pg_refresh{materialized_view = View}}) ->
-  {Position, {["REFRESH MATERIALIZED VIEW ", name_to_sql(View)], []}};
+  {Position, {["REFRESH MATERIALIZED VIEW ", identifier_to_sql(View)], []}};
 to_sql(Position, {sql_stmt, #truncate{table = Table, cascade = Cascade}}) ->
   case Cascade of
     false ->
-      {Position, {["TRUNCATE ", name_to_sql(Table)], []}};
+      {Position, {["TRUNCATE ", identifier_to_sql(Table)], []}};
     true ->
-      {Position, {["TRUNCATE ", name_to_sql(Table), " CASCADE"], []}}
+      {Position, {["TRUNCATE ", identifier_to_sql(Table), " CASCADE"], []}}
   end;
 to_sql(P, {sql_stmt, #union{type = Type, queries = Queries, order_by = Sort_Specs}}) ->
   {P2, {Clauses, Params}} = 
@@ -371,44 +395,46 @@ to_sql(P0, {sql_stmt, #select{quantifier = Quant,
                               offset = Offset,
                               for_update = For_Update}}) ->
   Quant_SQL = set_quant_to_sql(Quant),
-  case Columns of
+  {P1, {Columns_SQL, Columns_Parameters}} = to_sql_fold(P0, derived_column, Columns),
+  case Columns_SQL of
     [] ->
       Items = "*";
     _ ->
-      Items = intersperse([derived_col_to_sql(Column) || Column <- Columns], ", ")
+      Items = intersperse(Columns_SQL, ", ")
   end,
-  {P1, {Table_Ref_Clauses, Table_Ref_Parameters}} = 
-    to_sql_fold(P0, table_ref, From),
-  {P2, {Where_Clause, Where_Parameters}} = to_sql(P1, {where_clause, Where}),
-  {P3, {Sort_Spec_Clauses, Sort_Specs_Parameters}} =
-    to_sql_fold(P2, sort_spec, Sort_Specs),
+  {P2, {Table_Ref_Clauses, Table_Ref_Parameters}} =
+    to_sql_fold(P1, table_ref, From),
+  {P3, {Where_Clause, Where_Parameters}} = to_sql(P2, {where_clause, Where}),
+  {P4, {Sort_Spec_Clauses, Sort_Specs_Parameters}} =
+    to_sql_fold(P3, sort_spec, Sort_Specs),
   %% TODO: Group By expression, not only a list of columns.
-  case Group_By of
+  {P5, {Group_By_Exprs_SQL, Group_By_Parameters}} = to_sql_fold(P4, derived_column, Group_By),
+  case Group_By_Exprs_SQL of
     [] ->
       Group_By_Clause = "";
     _ ->
-      Group_By_Clause = [" GROUP BY ", intersperse([derived_col_to_sql(Column) || Column <- Group_By], ", ")]
+      Group_By_Clause = [" GROUP BY ", intersperse(Group_By_Exprs_SQL, ", ")]
   end,
   Order_By_Clause =
     case Sort_Spec_Clauses of
       [] -> "";
       _ -> [" ORDER BY ", intersperse(Sort_Spec_Clauses, ", ")]
     end,
-  {P4, {Offset_Clause, Offset_Params}} = to_sql(P3, {offset, Offset}),
+  {P6, {Offset_Clause, Offset_Params}} = to_sql(P5, {offset, Offset}),
   case For_Update of
     false ->
       For_Update_Clause = "";
     true ->
       For_Update_Clause = " FOR UPDATE"
   end,
-  {P4, {["SELECT ", Quant_SQL, " ", Items,
+  {P6, {["SELECT ", Quant_SQL, " ", Items,
          [" FROM ", intersperse(Table_Ref_Clauses, ", ")],
          Where_Clause,
          Group_By_Clause,
          Order_By_Clause,
          Offset_Clause,
          For_Update_Clause],
-        Table_Ref_Parameters ++ Where_Parameters ++ Sort_Specs_Parameters ++ Offset_Params}};
+        Columns_Parameters ++ Table_Ref_Parameters ++ Where_Parameters ++ Group_By_Parameters ++ Sort_Specs_Parameters ++ Offset_Params}};
 to_sql(P0, {sql_stmt, #insert{table = Table, 
                               columns = Columns, 
                               values = Rows,
@@ -417,8 +443,8 @@ to_sql(P0, {sql_stmt, #insert{table = Table,
     to_sql_fold(P0, value_expr_list, Rows),
   {P2, {Conflict_Clause, Conflict_Params}} = to_sql(P1, {on_conflict_update_target, Conflict_Columns, Columns}),
   {P2, {["INSERT INTO ",
-         name_to_sql(Table),
-         " (", intersperse([name_to_sql(Column) || Column <- Columns], ", "), ")",
+         identifier_to_sql(Table),
+         " (", intersperse([identifier_to_sql(Column) || Column <- Columns], ", "), ")",
          " VALUES ",
          intersperse(Values_Clause, ", "),
          Conflict_Clause,
@@ -430,13 +456,13 @@ to_sql(P0, {sql_stmt, #update{table = Table,
     %% TODO: cannot be easily factored into to_sql_fold
     lists:foldl(fun({Column, Value}, {PI, {Accum_SQL, Accum_Params}}) ->
                     {PJ, {Expr_SQL, Expr_Params}} = to_sql(PI, {value_expr, Value}),
-                    {PJ, {Accum_SQL ++ [[name_to_sql(Column), " = ", Expr_SQL]], Accum_Params ++ Expr_Params}}
+                    {PJ, {Accum_SQL ++ [[identifier_to_sql(Column), " = ", Expr_SQL]], Accum_Params ++ Expr_Params}}
                 end,
                 {P0, {[], []}},
                 Set),
   {P2, {Where_Clause, Where_Parameters}} = to_sql(P1, {where_clause, Where}),
   {P2, {["UPDATE ",
-         name_to_sql(Table),
+         identifier_to_sql(Table),
          " SET ",
          intersperse(Set_Clause, ", "),
          Where_Clause,
@@ -444,7 +470,7 @@ to_sql(P0, {sql_stmt, #update{table = Table,
 to_sql(P0, {sql_stmt, #delete{table = Table,
                               where = Where}}) ->
   {P1, {Where_Clause, Where_Parameters}} = to_sql(P0, {where_clause, Where}),
-  {P1, {["DELETE FROM ", name_to_sql(Table), Where_Clause, " RETURNING *"], Where_Parameters}};
+  {P1, {["DELETE FROM ", identifier_to_sql(Table), Where_Clause, " RETURNING *"], Where_Parameters}};
 %% Serialize <contextually typed row value expression list>
 %% Serialize a values clause
 to_sql(P0, {sql_stmt, #pg_with{definitions = Definitions,
@@ -452,7 +478,7 @@ to_sql(P0, {sql_stmt, #pg_with{definitions = Definitions,
   {P1, {Query_Clause, Query_Params}} =
     lists:foldl(fun({Name, Query}, {PI, {Accum_SQL, Accum_Params}}) ->
 		    {PJ, {Expr_SQL, Expr_Params}} = to_sql(PI, {sql_stmt, Query}),
-		    {PJ, {Accum_SQL ++ [[name_to_sql(Name), " AS (", Expr_SQL, ")"]], Accum_Params ++ Expr_Params}}
+		    {PJ, {Accum_SQL ++ [[identifier_chain_to_sql(Name), " AS (", Expr_SQL, ")"]], Accum_Params ++ Expr_Params}}
 		end,
 	       {P0, {[], []}},
 	       Definitions),
@@ -461,6 +487,24 @@ to_sql(P0, {sql_stmt, #pg_with{definitions = Definitions,
 	 intersperse(Query_Clause, ", "),
 	 " ",
 	 Select_Clause], Query_Params ++ Select_Params}};
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Serialize <derived column>
+to_sql(P0, {derived_column, {count, all}}) ->
+  {P0, {["COUNT(*)"],[]}};
+to_sql(P0, {derived_column, {count, {distinct, Column}}}) ->
+  {P1, {Value_Expr_SQL, Value_Expr_Parameters}} =
+    to_sql(P0, {value_expr, Column}),
+  {P1,{["COUNT(DISTINCT ", Value_Expr_SQL, ")"], Value_Expr_Parameters}};
+to_sql(P0, {derived_column, {count, Column}}) ->
+  {P1, {Value_Expr_SQL, Value_Expr_Parameters}} =
+    to_sql(P0, {value_expr, Column}),
+  {P1,{["COUNT(", Value_Expr_SQL, ")"], Value_Expr_Parameters}};
+to_sql(P0, {derived_column, {Column, Alias}}) when is_atom(Alias)->
+  {P1, {Value_Expr_SQL, Value_Expr_Parameters}} =
+    to_sql(P0, {value_expr, Column}),
+  {P1, {[Value_Expr_SQL, " AS ", identifier_to_sql(Alias)], Value_Expr_Parameters}};
+to_sql(P0, {derived_column, Column}) ->
+  to_sql(P0, {value_expr, Column});
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Serialize a list of <value expression>
 to_sql(P0, {value_expr_list, Row}) ->
@@ -547,7 +591,7 @@ to_sql(P0, {table_ref, Table_Primary}) ->
 %% Serialize <table primary>
 to_sql(P0, {table_primary, #pg_call{name = Name, args = Args}}) ->
   {P1, {Args_Clauses, Args_Params}} = to_sql_fold(P0, value_expr, Args),
-  {P1, {[name_to_sql(Name),
+  {P1, {[identifier_to_sql(Name),
          "(",
          intersperse(Args_Clauses, ", "),
          ")"], Args_Params}};
@@ -639,11 +683,11 @@ to_sql(P0, {on_conflict_update_target, [], _Columns}) ->
 to_sql(P0, {on_conflict_update_target, Conflict_Columns, Columns}) ->
   Columns_To_Update = lists:subtract(Columns, Conflict_Columns),
   Set_Clauses = [ begin
-                    Column_SQL = name_to_sql(Column),
+                    Column_SQL = identifier_to_sql(Column),
                     [Column_SQL, " = EXCLUDED.", Column_SQL]
                   end || Column <- Columns_To_Update ],
   {P0, {[" ON CONFLICT (", 
-         intersperse([name_to_sql(Column) || Column <- Conflict_Columns], ", "), 
+         intersperse([identifier_to_sql(Column) || Column <- Conflict_Columns], ", "), 
          ")",
          " DO UPDATE SET ", 
          intersperse(Set_Clauses, ", ")],
@@ -672,7 +716,7 @@ to_sql(P0, {predicate, {Logic_Bin_Op, [Pred1 | Predicates]}}) when Logic_Bin_Op 
               {P1, {Pred1_SQL, Pred1_Params}},
               Predicates);
 to_sql(P0, {predicate, {is_null, Column}}) ->
-  {P0, {[name_to_sql(Column), " IS NULL"], []}};
+  {P0, {[identifier_chain_to_sql(Column), " IS NULL"], []}};
 to_sql(P0, {predicate, {Left, Bin_Op, Right}})
   when Bin_Op == '=';
        Bin_Op == '!=';
@@ -756,43 +800,37 @@ to_sql_fold(P0, Node_Type, Nodes) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Serialize set quantifier
-%% @todo Integrate it in to_sql
 -spec set_quant_to_sql(set_quant()) -> iodata().
 set_quant_to_sql(all) -> "ALL";
 set_quant_to_sql(distinct) -> "DISTINCT".
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% @doc Serialize a derived column
-%% @todo Integrate it in to_sql
--spec derived_col_to_sql(derived_column()) -> iodata().
-derived_col_to_sql(Column) when is_atom(Column) ->
-  name_to_sql(Column);
-derived_col_to_sql({count, all}) ->
-  ["COUNT(*)"];
-derived_col_to_sql({count, {distinct, Column}}) ->
-  ["COUNT(DISTINCT ", name_to_sql(Column), ")"];
-derived_col_to_sql({count, Column}) ->
-  ["COUNT(", name_to_sql(Column), ")"];
-derived_col_to_sql({Column, Alias}) ->
-  [name_to_sql(Column), " AS ", name_to_sql(Alias)].
+%% @doc Serialize an identifier
+-spec identifier_to_sql(id()) -> iodata().
+identifier_to_sql(Id) ->
+  Identifier = atom_to_binary(Id, utf8),
+  case re:run(Identifier, ?IDENTIFIER_MP) of
+    {match, [{0,0}]} ->
+      throw({non_valid_identifier, Id});
+    {match, _Captured} ->
+      Identifier;
+    nomatch ->
+      throw({non_valid_identifier, Id})
+  end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% @doc Serialize an identifier
-%% @todo Integrate it in to_sql
--spec name_to_sql(identifier_chain() | id()) -> iodata().
-name_to_sql(Name) ->
-  Identifier = atom_to_binary(Name, utf8),
-  %% Regex = "^[a-zA-Z][a-zA-Z0-9_]*[\.a-zA-Z0-9_]*$|^[a-zA-Z][a-zA-Z0-9_]*$|^\"[a-zA-Z][a-zA-Z0-9_]*\"$",
-  %% {ok, MP} = re:compile(Regex),
-  %% case re:run(Identifier, MP) of
-  %%   {match, [{0,0}]} ->
-  %%     throw(non_valid_identifier);
-  %%   {match, _Captured} ->
-  %%     Identifier;
-  %%   nomatch ->
-  %%     throw(non_valid_identifier)
-  %% end.
-  Identifier.
+%% @doc Serialize an identifier_chain
+-spec identifier_chain_to_sql(identifier_chain()) -> iodata().
+identifier_chain_to_sql(Id) ->
+  Identifier = atom_to_binary(Id, utf8),
+  case re:run(Identifier, ?IDENTIFIER_CHAIN_MP) of
+    {match, [{0,0}]} ->
+      throw({non_valid_identifier, Id});
+    {match, _Captured} ->
+      Identifier;
+    nomatch ->
+      throw({non_valid_identifier, Id})
+  end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Returns placeholder according to position
