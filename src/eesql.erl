@@ -71,6 +71,17 @@
         identifier_chain_to_sql/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Precompiled regular expressions for checking proper identifiers and
+%% identifier chains
+
+%% io:format("~w~n", [re:compile("^(\"[a-zA-Z0-9_]+\"|^[a-zA-Z0-9_]+)$")]).
+-define(IDENTIFIER_MP, {re_pattern,1,0,0,<<69,82,67,80,157,0,0,0,16,0,0,0,1,0,0,0,255,255,255,255,255,255,255,255,0,0,0,0,0,0,1,0,0,0,64,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,125,0,89,25,127,0,43,0,1,29,34,106,0,0,0,0,0,0,255,3,254,255,255,135,254,255,255,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100,29,34,113,0,38,25,106,0,0,0,0,0,0,255,3,254,255,255,135,254,255,255,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100,114,0,81,27,114,0,89,0>>}).
+
+%% io:format("~w~n", [re:compile("^(\"[a-zA-Z0-9_]+\"|[a-zA-Z0-9_]+)(\.(\"[a-zA-Z0-9_]+\"|[a-zA-Z0-9_]+))*$")]).
+-define(IDENTIFIER_CHAIN_MP, {re_pattern,3,0,0,<<69,82,67,80,249,0,0,0,16,0,0,0,1,0,0,0,255,255,255,255,255,255,255,255,0,0,0,0,0,0,3,0,0,0,64,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,125,0,181,25,127,0,43,0,1,29,34,106,0,0,0,0,0,0,255,3,254,255,255,135,254,255,255,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100,29,34,113,0,37,106,0,0,0,0,0,0,255,3,254,255,255,135,254,255,255,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100,114,0,80,140,127,0,89,0,2,12,127,0,43,0,3,29,34,106,0,0,0,0,0,0,255,3,254,255,255,135,254,255,255,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100,29,34,113,0,37,106,0,0,0,0,0,0,255,3,254,255,255,135,254,255,255,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100,114,0,80,115,0,89,27,114,0,181,0>>}).
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% The following types represents the PG SQL Abstract Syntax Tree.
 
 %% Key SQL statements and fragments
@@ -798,9 +809,7 @@ set_quant_to_sql(distinct) -> "DISTINCT".
 -spec identifier_to_sql(id()) -> iodata().
 identifier_to_sql(Id) ->
   Identifier = atom_to_binary(Id, utf8),
-  Regex = "^(\"[a-zA-Z0-9_]+\"|^[a-zA-Z0-9_]+)$",
-  {ok, MP} = re:compile(Regex),
-  case re:run(Identifier, MP) of
+  case re:run(Identifier, ?IDENTIFIER_MP) of
     {match, [{0,0}]} ->
       throw({non_valid_identifier, Id});
     {match, _Captured} ->
@@ -814,9 +823,7 @@ identifier_to_sql(Id) ->
 -spec identifier_chain_to_sql(identifier_chain()) -> iodata().
 identifier_chain_to_sql(Id) ->
   Identifier = atom_to_binary(Id, utf8),
-  Regex = "^(\"[a-zA-Z0-9_]+\"|[a-zA-Z0-9_]+)(\.(\"[a-zA-Z0-9_]+\"|[a-zA-Z0-9_]+))*$",
-  {ok, MP} = re:compile(Regex),
-  case re:run(Identifier, MP) of
+  case re:run(Identifier, ?IDENTIFIER_CHAIN_MP) of
     {match, [{0,0}]} ->
       throw({non_valid_identifier, Id});
     {match, _Captured} ->
