@@ -80,6 +80,13 @@
 %% io:format("~w~n", [re:compile("^(\"[a-zA-Z0-9_]+\"|[a-zA-Z0-9_]+)(\.(\"[a-zA-Z0-9_]+\"|[a-zA-Z0-9_]+))*$")]).
 -define(IDENTIFIER_CHAIN_MP, {re_pattern,3,0,0,<<69,82,67,80,249,0,0,0,16,0,0,0,1,0,0,0,255,255,255,255,255,255,255,255,0,0,0,0,0,0,3,0,0,0,64,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,125,0,181,25,127,0,43,0,1,29,34,106,0,0,0,0,0,0,255,3,254,255,255,135,254,255,255,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100,29,34,113,0,37,106,0,0,0,0,0,0,255,3,254,255,255,135,254,255,255,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100,114,0,80,140,127,0,89,0,2,12,127,0,43,0,3,29,34,106,0,0,0,0,0,0,255,3,254,255,255,135,254,255,255,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100,29,34,113,0,37,106,0,0,0,0,0,0,255,3,254,255,255,135,254,255,255,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100,114,0,80,115,0,89,27,114,0,181,0>>}).
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Guards to pre validate that an atom could be an identifier
+-define(IS_IDENTIFIER(X),
+        is_atom(X),
+        X /= null,
+        X /= true,
+        X /= false).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% The following types represents the PG SQL Abstract Syntax Tree.
@@ -497,7 +504,7 @@ to_sql(P0, {derived_column, {count, Column}}) ->
   {P1, {Value_Expr_SQL, Value_Expr_Parameters}} =
     to_sql(P0, {value_expr, Column}),
   {P1,{["COUNT(", Value_Expr_SQL, ")"], Value_Expr_Parameters}};
-to_sql(P0, {derived_column, {Column, Alias}}) when is_atom(Alias)->
+to_sql(P0, {derived_column, {Column, Alias}}) when ?IS_IDENTIFIER(Alias)->
   {P1, {Value_Expr_SQL, Value_Expr_Parameters}} =
     to_sql(P0, {value_expr, Column}),
   {P1, {[Value_Expr_SQL, " AS ", identifier_to_sql(Alias)], Value_Expr_Parameters}};
@@ -744,10 +751,7 @@ to_sql(P0, {predicate, {in, Expr, Select = #select{}}}) ->
   {P2, {[Expr_SQL, " IN (", Select_SQL_Without_Semicolon, ")"], Expr_Params ++ Select_Params}};
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Serialize a <value expression>
-to_sql(P0, {value_expr, Column}) when is_atom(Column),
-                                      Column /= null,
-                                      Column /= true,
-                                      Column /= false ->
+to_sql(P0, {value_expr, Column}) when ?IS_IDENTIFIER(Column) ->
   {P0, {identifier_chain_to_sql(Column), []}};
 to_sql(P0, {value_expr, {cast, [Expr, Type]}}) ->
   {P1, {Expr_SQL, Expr_Params}} = 
