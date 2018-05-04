@@ -749,6 +749,11 @@ to_sql(P0, {value_expr, Column}) when is_atom(Column),
                                       Column /= true,
                                       Column /= false ->
   {P0, {identifier_chain_to_sql(Column), []}};
+to_sql(P0, {value_expr, {cast, [Expr, Type]}}) ->
+  {P1, {Expr_SQL, Expr_Params}} = 
+    to_sql(P0, {value_expr, Expr}),
+  Type_SQL = identifier_chain_to_sql(Type),
+  {P1, {["CAST(",Expr_SQL," AS ", Type_SQL, ")"], Expr_Params}};
 to_sql(P0, {value_expr, {Function_Name, Actual_Args}}) ->
   Routine_Name = atom_to_binary(Function_Name, utf8),
   {P1, {Args_SQLs, Args_Params}} = 
