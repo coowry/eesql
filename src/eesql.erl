@@ -332,9 +332,7 @@ to_sql(Statement) ->
              | {table_primary, table_primary()}
              | {literal, literal()}
              | {offset, undefined | {pos_integer(), pos_integer()}}
-             | {on_conflict_update_target, undefined | [column_reference()], [column_reference()]}
-             | {identifier, id()}
-             | {identifier_chain, identifier_chain()})
+             | {on_conflict_update_target, undefined | [column_reference()], [column_reference()]})
             -> {Pos, {Equery, Params}}
             when Pos :: pos_integer(),
                  Equery :: iodata(),
@@ -597,35 +595,29 @@ to_sql(P0, {table_primary, #pg_call{name = Name, args = Args}}) ->
          ")"], Args_Params}};
 to_sql(P0, {table_primary, {#pg_call{} = Call, Correlation_Name}}) ->
   {P1, {Call_Clause, Call_Params}} = to_sql(P0, {table_primary, Call}),
-  {P2, {Correlation, Correlation_Params}} = to_sql(P1, {identifier, Correlation_Name}),
-  {P2, {[Call_Clause, $ ,
+  Correlation = identifier_to_sql(Correlation_Name),
+  {P1, {[Call_Clause, $ ,
          "AS", $ ,
-         Correlation], Call_Params ++ Correlation_Params}};
+         Correlation], Call_Params}};
 to_sql(P0, {table_primary, {#select{} = Select, Correlation_Name}}) ->
   {P1, {Clauses, Select_Params}} = to_sql(P0, {sql_stmt, Select}),
-  {P2, {Correlation, Correlation_Params}} = to_sql(P1, {identifier, Correlation_Name}),
+  Correlation = identifier_to_sql(Correlation_Name),
   %% Remove semicolon from select sql to avoid syntax error
   %% TODO: The select shouldn't have the semicolon, which sould be added
   %% at the end of any query, since semicolon can only happen once and at the end.
   Clauses_Without_Semicolon = lists:droplast(Clauses),
-  {P2, {["(",
+  {P1, {["(",
          Clauses_Without_Semicolon,
          ")", $ ,
          "AS", $ ,
-         Correlation], Select_Params ++ Correlation_Params}};
+         Correlation], Select_Params}};
 to_sql(P0, {table_primary, {Table_Name, Correlation_Name}}) ->
-  {P1, {Table, Table_Params}} = to_sql(P0, {identifier_chain, Table_Name}),
-  {P2, {Correlation, Correlation_Params}} = to_sql(P1, {identifier, Correlation_Name}),
-  {P2, {[Table, $ ,
-        "AS", $ , Correlation], Table_Params ++ Correlation_Params}};
+  Table = identifier_chain_to_sql(Table_Name),
+  Correlation = identifier_to_sql(Correlation_Name),
+  {P0, {[Table, $ ,
+        "AS", $ , Correlation], []}};
 to_sql(P0, {table_primary, Table_Name}) ->
-  to_sql(P0, {identifier, Table_Name});
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Serialize <identifier>
-to_sql(P0, {identifier, Id}) ->
-  %% TODO: Check if Identifier is wellformed
-  Identifier = atom_to_binary(Id, utf8),
-  {P0, {Identifier, []}};
+  {P0, {identifier_chain_to_sql(Table_Name), []}};
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Serialize <where clause>
 to_sql(P0, {where_clause, undefined}) ->
@@ -756,7 +748,7 @@ to_sql(P0, {value_expr, Column}) when is_atom(Column),
                                       Column /= null,
                                       Column /= true,
                                       Column /= false ->
-  to_sql(P0, {identifier_chain, Column});
+  {P0, {identifier_chain_to_sql(Column), []}};
 to_sql(P0, {value_expr, {Function_Name, Actual_Args}}) ->
   Routine_Name = atom_to_binary(Function_Name, utf8),
   {P1, {Args_SQLs, Args_Params}} = 
@@ -768,12 +760,6 @@ to_sql(P0, {value_expr, Value_Exprs}) when is_list(Value_Exprs) ->
   {P1, {["{", intersperse(Values_SQLs, ", "), "}"], Values_Params}};
 to_sql(P0, {value_expr, Literal}) ->
   to_sql(P0, {literal, Literal});
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Serialize a <identifier chain>
-to_sql(P0, {identifier_chain, Id}) ->
-  %% TODO: Check identifier chain is wellformed
-  Identifier_Chain = atom_to_binary(Id, utf8),
-  {P0, {Identifier_Chain, []}};
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Serialize a <literal>
 to_sql(P0, {literal, null}) ->
