@@ -12,6 +12,12 @@
 
 ## Next release
 
+## v0.4.16
+
+- [F] Recover `users.*` as a valid identifier chain.
+- [+] Compilation of value expression {cast, [E, T]} to "CAST(E AS T)".
+- [T] Refactor: unifying identifier and identifier_chain SQL generation.
+
 ## v0.4.15
 
 - [+] AST structure improved for representing function calls in "derived columns" (FROM clause in SELECTs).

@@ -68,7 +68,7 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -export([identifier_to_sql/1,
-        identifier_chain_to_sql/1]).
+         identifier_chain_to_sql/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Precompiled regular expressions for checking proper identifiers and
@@ -77,9 +77,16 @@
 %% io:format("~w~n", [re:compile("^(\"[a-zA-Z0-9_]+\"|^[a-zA-Z0-9_]+)$")]).
 -define(IDENTIFIER_MP, {re_pattern,1,0,0,<<69,82,67,80,157,0,0,0,16,0,0,0,1,0,0,0,255,255,255,255,255,255,255,255,0,0,0,0,0,0,1,0,0,0,64,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,125,0,89,25,127,0,43,0,1,29,34,106,0,0,0,0,0,0,255,3,254,255,255,135,254,255,255,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100,29,34,113,0,38,25,106,0,0,0,0,0,0,255,3,254,255,255,135,254,255,255,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100,114,0,81,27,114,0,89,0>>}).
 
-%% io:format("~w~n", [re:compile("^(\"[a-zA-Z0-9_]+\"|[a-zA-Z0-9_]+)(\.(\"[a-zA-Z0-9_]+\"|[a-zA-Z0-9_]+))*$")]).
--define(IDENTIFIER_CHAIN_MP, {re_pattern,3,0,0,<<69,82,67,80,249,0,0,0,16,0,0,0,1,0,0,0,255,255,255,255,255,255,255,255,0,0,0,0,0,0,3,0,0,0,64,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,125,0,181,25,127,0,43,0,1,29,34,106,0,0,0,0,0,0,255,3,254,255,255,135,254,255,255,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100,29,34,113,0,37,106,0,0,0,0,0,0,255,3,254,255,255,135,254,255,255,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100,114,0,80,140,127,0,89,0,2,12,127,0,43,0,3,29,34,106,0,0,0,0,0,0,255,3,254,255,255,135,254,255,255,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100,29,34,113,0,37,106,0,0,0,0,0,0,255,3,254,255,255,135,254,255,255,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100,114,0,80,115,0,89,27,114,0,181,0>>}).
+%% io:format("~w~n", [re:compile("^(\"[a-zA-Z0-9_]+\"|[a-zA-Z0-9_]+)(\.(\"[a-zA-Z0-9_]+\"|[a-zA-Z0-9_]+))*(\.\*)?$")]).
+-define(IDENTIFIER_CHAIN_MP, {re_pattern,4,0,0,<<69,82,67,80,4,1,0,0,16,0,0,0,1,0,0,0,255,255,255,255,255,255,255,255,0,0,0,0,0,0,4,0,0,0,64,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,125,0,192,25,127,0,43,0,1,29,34,106,0,0,0,0,0,0,255,3,254,255,255,135,254,255,255,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100,29,34,113,0,37,106,0,0,0,0,0,0,255,3,254,255,255,135,254,255,255,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100,114,0,80,140,127,0,89,0,2,12,127,0,43,0,3,29,34,106,0,0,0,0,0,0,255,3,254,255,255,135,254,255,255,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100,29,34,113,0,37,106,0,0,0,0,0,0,255,3,254,255,255,135,254,255,255,7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100,114,0,80,115,0,89,140,127,0,7,0,4,85,12,114,0,7,27,114,0,192,0>>}).
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Guards to pre validate that an atom could be an identifier
+-define(IS_IDENTIFIER(X),
+        is_atom(X),
+        X /= null,
+        X /= true,
+        X /= false).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% The following types represents the PG SQL Abstract Syntax Tree.
@@ -332,9 +339,7 @@ to_sql(Statement) ->
              | {table_primary, table_primary()}
              | {literal, literal()}
              | {offset, undefined | {pos_integer(), pos_integer()}}
-             | {on_conflict_update_target, undefined | [column_reference()], [column_reference()]}
-             | {identifier, id()}
-             | {identifier_chain, identifier_chain()})
+             | {on_conflict_update_target, undefined | [column_reference()], [column_reference()]})
             -> {Pos, {Equery, Params}}
             when Pos :: pos_integer(),
                  Equery :: iodata(),
@@ -499,7 +504,7 @@ to_sql(P0, {derived_column, {count, Column}}) ->
   {P1, {Value_Expr_SQL, Value_Expr_Parameters}} =
     to_sql(P0, {value_expr, Column}),
   {P1,{["COUNT(", Value_Expr_SQL, ")"], Value_Expr_Parameters}};
-to_sql(P0, {derived_column, {Column, Alias}}) when is_atom(Alias)->
+to_sql(P0, {derived_column, {Column, Alias}}) when ?IS_IDENTIFIER(Alias)->
   {P1, {Value_Expr_SQL, Value_Expr_Parameters}} =
     to_sql(P0, {value_expr, Column}),
   {P1, {[Value_Expr_SQL, " AS ", identifier_to_sql(Alias)], Value_Expr_Parameters}};
@@ -597,35 +602,29 @@ to_sql(P0, {table_primary, #pg_call{name = Name, args = Args}}) ->
          ")"], Args_Params}};
 to_sql(P0, {table_primary, {#pg_call{} = Call, Correlation_Name}}) ->
   {P1, {Call_Clause, Call_Params}} = to_sql(P0, {table_primary, Call}),
-  {P2, {Correlation, Correlation_Params}} = to_sql(P1, {identifier, Correlation_Name}),
-  {P2, {[Call_Clause, $ ,
+  Correlation = identifier_to_sql(Correlation_Name),
+  {P1, {[Call_Clause, $ ,
          "AS", $ ,
-         Correlation], Call_Params ++ Correlation_Params}};
+         Correlation], Call_Params}};
 to_sql(P0, {table_primary, {#select{} = Select, Correlation_Name}}) ->
   {P1, {Clauses, Select_Params}} = to_sql(P0, {sql_stmt, Select}),
-  {P2, {Correlation, Correlation_Params}} = to_sql(P1, {identifier, Correlation_Name}),
+  Correlation = identifier_to_sql(Correlation_Name),
   %% Remove semicolon from select sql to avoid syntax error
   %% TODO: The select shouldn't have the semicolon, which sould be added
   %% at the end of any query, since semicolon can only happen once and at the end.
   Clauses_Without_Semicolon = lists:droplast(Clauses),
-  {P2, {["(",
+  {P1, {["(",
          Clauses_Without_Semicolon,
          ")", $ ,
          "AS", $ ,
-         Correlation], Select_Params ++ Correlation_Params}};
+         Correlation], Select_Params}};
 to_sql(P0, {table_primary, {Table_Name, Correlation_Name}}) ->
-  {P1, {Table, Table_Params}} = to_sql(P0, {identifier_chain, Table_Name}),
-  {P2, {Correlation, Correlation_Params}} = to_sql(P1, {identifier, Correlation_Name}),
-  {P2, {[Table, $ ,
-        "AS", $ , Correlation], Table_Params ++ Correlation_Params}};
+  Table = identifier_chain_to_sql(Table_Name),
+  Correlation = identifier_to_sql(Correlation_Name),
+  {P0, {[Table, $ ,
+        "AS", $ , Correlation], []}};
 to_sql(P0, {table_primary, Table_Name}) ->
-  to_sql(P0, {identifier, Table_Name});
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Serialize <identifier>
-to_sql(P0, {identifier, Id}) ->
-  %% TODO: Check if Identifier is wellformed
-  Identifier = atom_to_binary(Id, utf8),
-  {P0, {Identifier, []}};
+  {P0, {identifier_chain_to_sql(Table_Name), []}};
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Serialize <where clause>
 to_sql(P0, {where_clause, undefined}) ->
@@ -752,11 +751,13 @@ to_sql(P0, {predicate, {in, Expr, Select = #select{}}}) ->
   {P2, {[Expr_SQL, " IN (", Select_SQL_Without_Semicolon, ")"], Expr_Params ++ Select_Params}};
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Serialize a <value expression>
-to_sql(P0, {value_expr, Column}) when is_atom(Column),
-                                      Column /= null,
-                                      Column /= true,
-                                      Column /= false ->
-  to_sql(P0, {identifier_chain, Column});
+to_sql(P0, {value_expr, Column}) when ?IS_IDENTIFIER(Column) ->
+  {P0, {identifier_chain_to_sql(Column), []}};
+to_sql(P0, {value_expr, {cast, [Expr, Type]}}) ->
+  {P1, {Expr_SQL, Expr_Params}} = 
+    to_sql(P0, {value_expr, Expr}),
+  Type_SQL = identifier_chain_to_sql(Type),
+  {P1, {["CAST(",Expr_SQL," AS ", Type_SQL, ")"], Expr_Params}};
 to_sql(P0, {value_expr, {Function_Name, Actual_Args}}) ->
   Routine_Name = atom_to_binary(Function_Name, utf8),
   {P1, {Args_SQLs, Args_Params}} = 
@@ -768,12 +769,6 @@ to_sql(P0, {value_expr, Value_Exprs}) when is_list(Value_Exprs) ->
   {P1, {["{", intersperse(Values_SQLs, ", "), "}"], Values_Params}};
 to_sql(P0, {value_expr, Literal}) ->
   to_sql(P0, {literal, Literal});
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Serialize a <identifier chain>
-to_sql(P0, {identifier_chain, Id}) ->
-  %% TODO: Check identifier chain is wellformed
-  Identifier_Chain = atom_to_binary(Id, utf8),
-  {P0, {Identifier_Chain, []}};
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Serialize a <literal>
 to_sql(P0, {literal, null}) ->
