@@ -804,28 +804,30 @@ set_quant_to_sql(distinct) -> "DISTINCT".
 -spec identifier_to_sql(id()) -> iodata().
 identifier_to_sql(Id) ->
   Identifier = atom_to_binary(Id, utf8),
-  case re:run(Identifier, ?IDENTIFIER_MP) of
-    {match, [{0,0}]} ->
-      throw({non_valid_identifier, Id});
-    {match, _Captured} ->
-      Identifier;
-    nomatch ->
-      throw({non_valid_identifier, Id})
-  end.
+  %% case re:run(Identifier, ?IDENTIFIER_MP) of
+  %%   {match, [{0,0}]} ->
+  %%     throw({non_valid_identifier, Id});
+  %%   {match, _Captured} ->
+  %%     Identifier;
+  %%   nomatch ->
+  %%     throw({non_valid_identifier, Id})
+  %% end.
+  Identifier.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Serialize an identifier_chain
 -spec identifier_chain_to_sql(identifier_chain()) -> iodata().
 identifier_chain_to_sql(Id) ->
   Identifier = atom_to_binary(Id, utf8),
-  case re:run(Identifier, ?IDENTIFIER_CHAIN_MP) of
-    {match, [{0,0}]} ->
-      throw({non_valid_identifier, Id});
-    {match, _Captured} ->
-      Identifier;
-    nomatch ->
-      throw({non_valid_identifier, Id})
-  end.
+  %% case re:run(Identifier, ?IDENTIFIER_CHAIN_MP) of
+  %%   {match, [{0,0}]} ->
+  %%     throw({non_valid_identifier, Id});
+  %%   {match, _Captured} ->
+  %%     Identifier;
+  %%   nomatch ->
+  %%     throw({non_valid_identifier, Id})
+  %% end.
+  Identifier.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Returns placeholder according to position

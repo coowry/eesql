@@ -12,6 +12,10 @@
 
 ## Next release
 
+- [F] Hotfix to allow injecting SQL through identifiers. We need to
+  recover the validation functionality once cwdal does not depends on
+  SQL injection for unsuported functions such as ||.
+
 ## v0.4.16
 
 - [F] Recover `users.*` as a valid identifier chain.

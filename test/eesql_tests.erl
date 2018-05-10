@@ -561,8 +561,14 @@ identifier_test() ->
   ?assertEqual(<<"user_">>, eesql:identifier_to_sql(user_)),
   ?assertEqual(<<"us1er">>, eesql:identifier_to_sql(us1er)),
   ?assertEqual(<<"\"user\"">>, eesql:identifier_to_sql('"user"')),
-  ?assertException(throw, {non_valid_identifier,'user.address'}, eesql:identifier_to_sql('user.address')),
+
+  %% ?assertException(throw, {non_valid_identifier,'user.address'}, eesql:identifier_to_sql('user.address')),
+  ?assertEqual(<<"user.address">>, eesql:identifier_to_sql('user.address')),
+
   ?assertEqual(<<"user.address">>, eesql:identifier_chain_to_sql('user.address')),
   ?assertEqual(<<"\"user\".address">>, eesql:identifier_chain_to_sql('"user".address')),
   ?assertEqual(<<"user.\"address\"">>, eesql:identifier_chain_to_sql('user."address"')),
-  ?assertException(throw, {non_valid_identifier,'user.'}, eesql:identifier_to_sql('user.')).
+
+  %% ?assertException(throw, {non_valid_identifier,'user.'}, eesql:identifier_to_sql('user.')).
+  %% ?assertException(throw, {non_valid_identifier,'\'user-\' || userid'}, eesql:identifier_to_sql('\'user-\' || userid')).
+  ?assertEqual(<<"'user-' || user.id">>, eesql:identifier_chain_to_sql('\'user-\' || user.id')).
