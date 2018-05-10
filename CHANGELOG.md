@@ -12,6 +12,8 @@
 
 ## Next release
 
+## v0.4.17
+
 - [F] Hotfix to allow injecting SQL through identifiers. We need to
   recover the validation functionality once cwdal does not depends on
   SQL injection for unsuported functions such as ||.
