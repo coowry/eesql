@@ -12,6 +12,10 @@
 
 ## Next release
 
+## v0.4.18
+
+- [F] Adapt to erlang20
+
 ## v0.4.17
 
 - [F] Hotfix to allow injecting SQL through identifiers. We need to
