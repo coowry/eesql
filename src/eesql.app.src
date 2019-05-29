@@ -1,6 +1,6 @@
 {application, eesql,
  [{description, "Erlang Embedded SQL library"},
-  {vsn, "0.4.18"},
+  {vsn, "0.4.19"},
   {registered, []},
   {applications,
    [kernel,
@@ -9,7 +9,6 @@
    ]},
   {env,[]},
   {modules, []},
-  {maintainers, []},
-  {licenses, []},
-  {links, []}
+  {licenses, ["MIT"]},
+  {links, [{"GitHub", "https://github.com/coowry/eesql"}]}
  ]}.

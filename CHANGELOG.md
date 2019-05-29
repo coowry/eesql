@@ -12,6 +12,12 @@
 
 ## Next release
 
+## v0.4.19
+
+- [T] License changed: MIT.
+- [T] ./rebar3 upgraded to 3.9.1
+- [T] src/eesql.app.src adapted for publishing in hex.pm
+
 ## v0.4.18
 
 - [F] Adapt to erlang20

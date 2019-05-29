@@ -1,6 +1,8 @@
 # Erlang Embedded SQL library
 
-This library is allow you to represent SQL sentences as Erlang terms.
+This library allows you to represent SQL sentences as Erlang
+terms. Please, consider it as a failed **proof of concept**, it is
+incomplete and we do not recommend to be used in production.
 
 A pretty print function generates SQL in the form of an Extended
 Query: `iodata()` + parameters. The is directly usable in second and
